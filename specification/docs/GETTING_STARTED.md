@@ -12,7 +12,7 @@ Add the AgentGuard Spring Boot starter to your `pom.xml`:
 <dependency>
     <groupId>io.github.amaljeevs</groupId>
     <artifactId>agentguard-spring-boot-starter</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>0.1.0</version>
 </dependency>
 ```
 

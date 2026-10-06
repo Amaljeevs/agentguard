@@ -70,7 +70,7 @@ Existing protocols like OAuth and OIDC answer **who authenticated the connection
 <dependency>
     <groupId>io.github.amaljeevs</groupId>
     <artifactId>agentguard-spring-boot-starter</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>0.1.0</version>
 </dependency>
 ```
 
@@ -171,7 +171,7 @@ Artifacts are published to Maven Central under group ID `io.github.amaljeevs`:
 <dependency>
     <groupId>io.github.amaljeevs</groupId>
     <artifactId>agentguard-spring-boot-starter</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>0.1.0</version>
 </dependency>
 ```
 

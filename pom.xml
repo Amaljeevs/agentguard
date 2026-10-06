@@ -7,7 +7,7 @@
 
     <groupId>io.github.amaljeevs</groupId>
     <artifactId>agentguard-parent</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>0.1.0</version>
     <packaging>pom</packaging>
 
     <name>AgentGuard :: Parent</name>
@@ -206,6 +206,9 @@
                             <publishingServerId>central</publishingServerId>
                             <autoPublish>true</autoPublish>
                             <waitUntil>published</waitUntil>
+                            <excludeArtifacts>
+                                <exclude>spring-mcp-example</exclude>
+                            </excludeArtifacts>
                         </configuration>
                     </plugin>
                     <plugin>
