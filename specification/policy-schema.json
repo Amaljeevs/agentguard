@@ -1,0 +1,104 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agentguard.io/schemas/v1/policy.schema.json",
+  "title": "AgentGuard Policy Schema",
+  "description": "Language-neutral declarative authorization and governance policy schema for AI agents.",
+  "type": "object",
+  "required": ["version", "roles"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Policy specification version",
+      "enum": ["1", "1.0"]
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "author": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "roles": {
+      "type": "object",
+      "description": "Role-to-permission mappings (RBAC)",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["permissions"],
+        "properties": {
+          "description": { "type": "string" },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^(\\*|[a-zA-Z0-9_-]+(\\.[a-zA-Z0-9_*-]+)*)$"
+            },
+            "uniqueItems": true
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "rules": {
+      "type": "array",
+      "description": "Fine-grained contextual rules (ABAC, environment, approval triggers)",
+      "items": {
+        "type": "object",
+        "required": ["id", "effect", "target"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_-]+$"
+          },
+          "description": { "type": "string" },
+          "effect": {
+            "type": "string",
+            "enum": ["ALLOW", "DENY", "APPROVAL_REQUIRED"]
+          },
+          "target": {
+            "type": "object",
+            "properties": {
+              "roles": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "actions": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "resources": {
+                "type": "object",
+                "properties": {
+                  "type": { "type": "string" },
+                  "id": { "type": "string" }
+                },
+                "additionalProperties": false
+              },
+              "conditions": {
+                "type": "object",
+                "properties": {
+                  "environment": {
+                    "type": "object",
+                    "properties": {
+                      "equals": { "type": "string" },
+                      "in": {
+                        "type": "array",
+                        "items": { "type": "string" }
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": true
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,6 @@
+{
+  "name": "AgentGuard - Authorization & Governance for AI Agents & MCP",
+  "description": "Production-grade language-neutral authorization and governance framework for AI agents interacting with MCP servers, tools, APIs, and databases.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

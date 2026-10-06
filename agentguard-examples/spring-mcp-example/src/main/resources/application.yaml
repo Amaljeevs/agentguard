@@ -1,0 +1,19 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: spring-mcp-example
+
+agentguard:
+  enabled: true
+  policy-location: "classpath:agentguard-policy.yaml"
+  environment: "development"
+  audit:
+    enabled: true
+    mask-token: "[REDACTED]"
+    sensitive-keys:
+      - "password"
+      - "token"
+      - "secret"
+      - "apiKey"

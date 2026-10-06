@@ -1,0 +1,69 @@
+version: "1.0"
+metadata:
+  name: "enterprise-mcp-governance"
+  description: "Core access policy for developer and devops agents interacting with MCP server"
+
+roles:
+  developer:
+    description: "Software development assistant"
+    permissions:
+      - "git.read"
+      - "git.write"
+      - "logs.read"
+      - "database.query"
+
+  devops:
+    description: "Infrastructure management agent"
+    permissions:
+      - "logs.read"
+      - "kubernetes.*"
+      - "database.*"
+
+  security-auditor:
+    description: "Read-only compliance audit agent"
+    permissions:
+      - "*.read"
+
+  admin:
+    description: "Universal administrator agent"
+    permissions:
+      - "*"
+
+rules:
+  # 1. Deny developers querying production databases
+  - id: "deny-dev-prod-db"
+    description: "Developers cannot access production databases"
+    effect: DENY
+    target:
+      roles:
+        - "developer"
+      actions:
+        - "database.query"
+      resources:
+        type: "database"
+      conditions:
+        environment:
+          equals: "production"
+
+  # 2. Production deployments require human approval
+  - id: "prod-deploy-approval"
+    description: "Kubernetes deployment to production requires human sign-off"
+    effect: APPROVAL_REQUIRED
+    target:
+      actions:
+        - "kubernetes.deploy"
+      conditions:
+        environment:
+          equals: "production"
+
+  # 3. Deny destructive actions in production across all agents
+  - id: "deny-destructive-drop-prod"
+    description: "Explicitly deny database drop/truncate across all agents in production"
+    effect: DENY
+    target:
+      actions:
+        - "database.drop"
+        - "database.truncate"
+      conditions:
+        environment:
+          equals: "production"
