@@ -22,11 +22,11 @@ import java.util.Set;
  * Standard implementation of {@link PolicyEngine}.
  * Enforces:
  * <ol>
- *   <li>Fail-closed identity validity & expiration checks</li>
+ *   <li>Fail-closed identity validity and expiration checks</li>
  *   <li>Explicit DENY rules precedence over all ALLOW grants</li>
  *   <li>APPROVAL_REQUIRED evaluation for sensitive or high-risk actions</li>
  *   <li>RBAC permission matching with hierarchical wildcards</li>
- *   <li>Contextual environment & resource matching</li>
+ *   <li>Contextual environment and resource matching</li>
  *   <li>Deny-by-default if no active rule or permission permits the action</li>
  * </ol>
  */
