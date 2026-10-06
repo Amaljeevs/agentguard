@@ -161,6 +161,19 @@ class YamlPolicyLoaderTest {
 
         assertThatThrownBy(() -> loader.load(noRolesYaml))
             .isInstanceOf(InvalidPolicyException.class)
+            .hasMessageContaining("roles");
+    }
+
+    @Test
+    @DisplayName("Should reject empty roles map")
+    void shouldRejectEmptyRoles() {
+        String emptyRolesYaml = """
+            version: "1.0"
+            roles: {}
+            """;
+
+        assertThatThrownBy(() -> loader.load(emptyRolesYaml))
+            .isInstanceOf(InvalidPolicyException.class)
             .hasMessageContaining("'roles' section must not be empty");
     }
 
