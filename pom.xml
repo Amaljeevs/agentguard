@@ -12,7 +12,7 @@
 
     <name>AgentGuard :: Parent</name>
     <description>Language-neutral authorization and governance framework for AI agents and Model Context Protocol (MCP)</description>
-    <url>https://github.com/amaljeev/agentguard</url>
+    <url>https://github.com/Amaljeevs/agentguard</url>
 
     <licenses>
         <license>
@@ -24,18 +24,18 @@
 
     <developers>
         <developer>
-            <id>amaljeev</id>
-            <name>Amal Jeev S</name>
+            <id>Amaljeevs</id>
+            <name>Amal jeev s</name>
             <email>amaljeev3739@gmail.com</email>
             <organization>AgentGuard Open Source</organization>
-            <organizationUrl>https://github.com/amaljeev/agentguard</organizationUrl>
+            <organizationUrl>https://github.com/Amaljeevs/agentguard</organizationUrl>
         </developer>
     </developers>
 
     <scm>
-        <connection>scm:git:git://github.com/amaljeev/agentguard.git</connection>
-        <developerConnection>scm:git:ssh://github.com:amaljeev/agentguard.git</developerConnection>
-        <url>https://github.com/amaljeev/agentguard</url>
+        <connection>scm:git:git://github.com/Amaljeevs/agentguard.git</connection>
+        <developerConnection>scm:git:ssh://github.com:Amaljeevs/agentguard.git</developerConnection>
+        <url>https://github.com/Amaljeevs/agentguard</url>
         <tag>HEAD</tag>
     </scm>
 

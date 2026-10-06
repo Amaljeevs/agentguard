@@ -157,9 +157,9 @@ public class DatabaseTools {
 
 ## Author & Maintainer
 
-- **Author**: **Amal Jeev S** ([@amaljeev](https://github.com/amaljeev))
+- **Author**: **Amal jeev s** ([@Amaljeevs](https://github.com/Amaljeevs))
 - **Email**: `amaljeev3739@gmail.com`
-- **Repository**: [https://github.com/amaljeev/agentguard](https://github.com/amaljeev/agentguard)
+- **Repository**: [https://github.com/Amaljeevs/agentguard](https://github.com/Amaljeevs/agentguard)
 
 ---
 
