@@ -111,15 +111,17 @@ public class AgentAuthorizationAspect {
 
         // 8. Enforce decision outcome
         if (decision.isDenied()) {
+            String ruleSuffix = decision.matchedRuleId().map(r -> " [rule: " + r + "]").orElse("");
             throw new AgentAccessDeniedException(
-                String.format("AgentGuard authorization DENIED: %s", decision.reason()),
+                String.format("AgentGuard authorization DENIED: %s%s", decision.reason(), ruleSuffix),
                 decision
             );
         }
 
         if (decision.isApprovalRequired()) {
+            String ruleSuffix = decision.matchedRuleId().map(r -> " [rule: " + r + "]").orElse("");
             throw new AgentApprovalRequiredException(
-                String.format("AgentGuard APPROVAL_REQUIRED: %s", decision.reason()),
+                String.format("AgentGuard APPROVAL_REQUIRED: %s%s", decision.reason(), ruleSuffix),
                 decision
             );
         }
