@@ -22,12 +22,15 @@ jobs:
           server-id: central
           server-username: MAVEN_CENTRAL_USERNAME
           server-password: MAVEN_CENTRAL_TOKEN
-          gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
-          gpg-passphrase: MAVEN_GPG_PASSPHRASE
+
+      - name: Import GPG Key
+        env:
+          GPG_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+        run: |
+          echo "$GPG_KEY" | gpg --batch --import
 
       - name: Publish with Maven Central Plugin
         env:
           MAVEN_CENTRAL_USERNAME: ${{ secrets.CENTRAL_PORTAL_TOKEN_USERNAME }}
           MAVEN_CENTRAL_TOKEN: ${{ secrets.CENTRAL_PORTAL_TOKEN_PASSWORD }}
-          MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: mvn clean deploy -P release --batch-mode -DskipTests
