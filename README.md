@@ -68,7 +68,7 @@ Existing protocols like OAuth and OIDC answer **who authenticated the connection
 
 ```xml
 <dependency>
-    <groupId>io.agentguard</groupId>
+    <groupId>io.github.amaljeevs</groupId>
     <artifactId>agentguard-spring-boot-starter</artifactId>
     <version>0.1.0-SNAPSHOT</version>
 </dependency>
@@ -165,13 +165,13 @@ public class DatabaseTools {
 
 ## Maven Central Publishing
 
-Artifacts are published to Maven Central under group ID `io.agentguard`:
+Artifacts are published to Maven Central under group ID `io.github.amaljeevs`:
 
 ```xml
 <dependency>
-    <groupId>io.agentguard</groupId>
+    <groupId>io.github.amaljeevs</groupId>
     <artifactId>agentguard-spring-boot-starter</artifactId>
-    <version>0.1.0</version>
+    <version>0.1.0-SNAPSHOT</version>
 </dependency>
 ```
 

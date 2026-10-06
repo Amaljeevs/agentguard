@@ -1215,7 +1215,7 @@ rules:
               </p>
               <pre className="bg-slate-950 p-4 rounded-xl border border-slate-800 font-mono text-xs text-indigo-200 overflow-x-auto">
 {`<dependency>
-    <groupId>io.agentguard</groupId>
+    <groupId>io.github.amaljeevs</groupId>
     <artifactId>agentguard-spring-boot-starter</artifactId>
     <version>0.1.0-SNAPSHOT</version>
 </dependency>`}

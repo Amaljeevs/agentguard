@@ -6,7 +6,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>io.agentguard</groupId>
+        <groupId>io.github.amaljeevs</groupId>
         <artifactId>agentguard-parent</artifactId>
         <version>0.1.0-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
@@ -19,15 +19,15 @@
     <dependencies>
         <!-- Internal modules -->
         <dependency>
-            <groupId>io.agentguard</groupId>
+            <groupId>io.github.amaljeevs</groupId>
             <artifactId>agentguard-core</artifactId>
         </dependency>
         <dependency>
-            <groupId>io.agentguard</groupId>
+            <groupId>io.github.amaljeevs</groupId>
             <artifactId>agentguard-policy</artifactId>
         </dependency>
         <dependency>
-            <groupId>io.agentguard</groupId>
+            <groupId>io.github.amaljeevs</groupId>
             <artifactId>agentguard-audit</artifactId>
         </dependency>
 

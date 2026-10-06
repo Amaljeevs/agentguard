@@ -5,7 +5,7 @@
          http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>io.agentguard</groupId>
+    <groupId>io.github.amaljeevs</groupId>
     <artifactId>agentguard-parent</artifactId>
     <version>0.1.0-SNAPSHOT</version>
     <packaging>pom</packaging>
@@ -75,32 +75,32 @@
         <dependencies>
             <!-- Internal modules -->
             <dependency>
-                <groupId>io.agentguard</groupId>
+                <groupId>io.github.amaljeevs</groupId>
                 <artifactId>agentguard-core</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
-                <groupId>io.agentguard</groupId>
+                <groupId>io.github.amaljeevs</groupId>
                 <artifactId>agentguard-policy</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
-                <groupId>io.agentguard</groupId>
+                <groupId>io.github.amaljeevs</groupId>
                 <artifactId>agentguard-audit</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
-                <groupId>io.agentguard</groupId>
+                <groupId>io.github.amaljeevs</groupId>
                 <artifactId>agentguard-spring</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
-                <groupId>io.agentguard</groupId>
+                <groupId>io.github.amaljeevs</groupId>
                 <artifactId>agentguard-spring-boot-starter</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
-                <groupId>io.agentguard</groupId>
+                <groupId>io.github.amaljeevs</groupId>
                 <artifactId>agentguard-mcp</artifactId>
                 <version>${project.version}</version>
             </dependency>

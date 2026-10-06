@@ -600,7 +600,7 @@ class SpringMcpExampleApplicationTest {
 
 ## 1. Add Maven Dependency
 <dependency>
-    <groupId>io.agentguard</groupId>
+    <groupId>io.github.amaljeevs</groupId>
     <artifactId>agentguard-spring-boot-starter</artifactId>
     <version>0.1.0-SNAPSHOT</version>
 </dependency>
