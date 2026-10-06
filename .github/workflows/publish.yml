@@ -27,10 +27,11 @@ jobs:
         env:
           GPG_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
         run: |
-          echo "$GPG_KEY" | gpg --batch --import
+          echo "$GPG_KEY" | gpg --batch --import || true
+          gpg --list-secret-keys
 
       - name: Publish with Maven Central Plugin
         env:
           MAVEN_CENTRAL_USERNAME: ${{ secrets.CENTRAL_PORTAL_TOKEN_USERNAME }}
           MAVEN_CENTRAL_TOKEN: ${{ secrets.CENTRAL_PORTAL_TOKEN_PASSWORD }}
-        run: mvn clean deploy -P release --batch-mode -DskipTests
+        run: mvn clean deploy -P release --batch-mode -DskipTests -Dgpg.passphrase=""
