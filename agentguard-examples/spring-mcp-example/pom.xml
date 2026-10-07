@@ -16,11 +16,6 @@
     <name>AgentGuard :: Examples :: Spring MCP Server</name>
     <description>Working Spring Boot 3 Model Context Protocol (MCP) server secured with AgentGuard.</description>
 
-    <properties>
-        <maven.deploy.skip>true</maven.deploy.skip>
-        <skipPublishing>true</skipPublishing>
-    </properties>
-
     <dependencies>
         <!-- AgentGuard Spring Boot Starter -->
         <dependency>
@@ -55,16 +50,4 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
-
-    <build>
-        <plugins>
-            <plugin>
-                <groupId>org.sonatype.central</groupId>
-                <artifactId>central-publishing-maven-plugin</artifactId>
-                <configuration>
-                    <skipPublishing>true</skipPublishing>
-                </configuration>
-            </plugin>
-        </plugins>
-    </build>
 </project>

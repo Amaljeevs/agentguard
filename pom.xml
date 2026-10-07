@@ -46,7 +46,6 @@
         <module>agentguard-spring</module>
         <module>agentguard-spring-boot-starter</module>
         <module>agentguard-mcp</module>
-        <module>agentguard-examples/spring-mcp-example</module>
     </modules>
 
     <properties>
@@ -194,6 +193,15 @@
 
     <profiles>
         <profile>
+            <id>examples</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <modules>
+                <module>agentguard-examples/spring-mcp-example</module>
+            </modules>
+        </profile>
+        <profile>
             <id>release</id>
             <build>
                 <plugins>
@@ -206,9 +214,6 @@
                             <publishingServerId>central</publishingServerId>
                             <autoPublish>true</autoPublish>
                             <waitUntil>published</waitUntil>
-                            <excludeArtifacts>
-                                <exclude>spring-mcp-example</exclude>
-                            </excludeArtifacts>
                         </configuration>
                     </plugin>
                     <plugin>
