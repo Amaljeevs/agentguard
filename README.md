@@ -73,6 +73,26 @@ For a complete project that consumes the **published Maven Central release**, se
 It demonstrates allowed, denied, and approval-required calls, audit redaction, and
 MCP error mapping without building or installing AgentGuard locally.
 
+### Run the H2 Orders App
+
+With Java 21+ and Maven installed:
+
+```bash
+cd agentguard-examples/h2-orders-app
+mvn verify
+java -jar target/h2-orders-app-1.0.0-SNAPSHOT.jar --debug=false
+```
+
+Open **http://localhost:8080**. Sign in as `developer`, `operator`, `approver`, or
+`auditor`, using password `demo-pass`. The app includes a seeded H2 database,
+real SQL operations, production refund approvals, and audit records with nested
+secret redaction. Data resets when the app restarts.
+
+On Windows, you can use `./run.ps1` from the app directory to build and start it.
+Run `./demo.ps1` in another PowerShell terminal for an automated API walkthrough.
+See the [app README](agentguard-examples/h2-orders-app/README.md) for role permissions,
+API usage, and the distinction between library features and application code.
+
 ### 1. Add Maven Dependency
 
 ```xml
@@ -154,12 +174,12 @@ public class DatabaseTools {
 | Module | Description |
 | :--- | :--- |
 | `agentguard-core` | Pure Java 21 domain models, records, and deterministic Policy Decision Point (PDP). Zero external dependencies. |
-| `agentguard-policy` | YAML parser and JSON Schema validator for `agentguard-policy.yaml`. |
-| `agentguard-audit` | Structured audit event publishers (SLF4J, OpenTelemetry, SIEM) with parameter sanitization. |
+| `agentguard-policy` | YAML policy loading, validation, and compilation for `agentguard-policy.yaml`. |
+| `agentguard-audit` | Structured audit events, recursive parameter sanitization, and SLF4J, in-memory, and composite publishers. |
 | `agentguard-spring` | `@AgentAuthorize` AOP interceptor and Spring Security context adapter. |
-| `agentguard-spring-boot-starter`| Spring Boot 3 auto-configuration and health checks. |
-| `agentguard-mcp` | MCP tool call filter, JSON-RPC error mapping (`-32003`, `-32004`). |
-| `agentguard-examples` | Runnable Spring Boot MCP sample application. |
+| `agentguard-spring-boot-starter`| Spring Boot 3 auto-configuration and configuration properties. |
+| `agentguard-mcp` | Authorization exception mapping to MCP/JSON-RPC error objects (`-32001`, `-32003`, `-32004`). |
+| `agentguard-examples` | Spring integration sample, standalone published-dependency demo, and runnable H2 orders app. |
 | `specification` | Language-neutral JSON Schema and architectural documentation. |
 
 ---
@@ -167,8 +187,15 @@ public class DatabaseTools {
 ## Author & Maintainer
 
 - **Author**: **Amal jeev s** ([@Amaljeevs](https://github.com/Amaljeevs))
-- **Email**: `amaljeev3739@gmail.com`
+- **Email**: [amaljeevs3739@gmail.com](mailto:amaljeevs3739@gmail.com)
 - **Repository**: [https://github.com/Amaljeevs/agentguard](https://github.com/Amaljeevs/agentguard)
+
+---
+
+## Security Reports
+
+Report vulnerabilities privately to [amaljeevs3739@gmail.com](mailto:amaljeevs3739@gmail.com).
+See [SECURITY.md](SECURITY.md) for the reporting process.
 
 ---
 

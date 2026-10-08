@@ -6,7 +6,7 @@ The AgentGuard project treats security vulnerabilities with the highest priority
 
 ### Reporting Process
 
-1. Email your report to: `security@agentguard.io` (or report via private GitHub Security Advisory).
+1. Email your report to: [amaljeevs3739@gmail.com](mailto:amaljeevs3739@gmail.com) (or report via private GitHub Security Advisory).
 2. Include the following details:
    - Component / module affected (`agentguard-core`, `agentguard-policy`, `agentguard-spring`, etc.)
    - Detailed description of the vulnerability and attack vector
