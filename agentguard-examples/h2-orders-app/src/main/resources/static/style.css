@@ -1,0 +1,9 @@
+:root { font-family: system-ui, sans-serif; color: #18313b; background: #f0f4f3; }
+body { margin: 0; } header { background: #143c3c; color: white; padding: 26px max(24px, calc((100vw - 1100px) / 2)); display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+h1 { margin: 6px 0; font-size: 32px; } small { letter-spacing: .15em; } main { max-width: 1100px; margin: 28px auto 70px; padding: 0 20px; } .intro { font-size: 20px; }
+section { background: white; border: 1px solid #d5e2df; border-radius: 10px; padding: 24px; margin: 20px 0; } h2 { font-size: 20px; margin-top: 0; } .hint { color: #52696c; line-height: 1.6; }
+button, select { font: inherit; padding: 9px 14px; border-radius: 5px; border: 1px solid #94b2ac; } button { cursor: pointer; background: #e7f2ee; color: #143c3c; margin: 4px; } button:hover { background: #cde6dd; } button:disabled { opacity: .6; cursor: wait; }
+textarea { display: block; width: 100%; box-sizing: border-box; min-height: 245px; font: 14px/1.5 monospace; padding: 14px; margin: 10px 0; border: 1px solid #94b2ac; border-radius: 5px; }
+table { width: 100%; border-collapse: collapse; } td, th { padding: 12px 8px; text-align: left; border-bottom: 1px solid #e0e8e5; } .table-wrap { overflow-x: auto; }
+.section-head { display: flex; align-items: center; justify-content: space-between; } .section-head h2 { margin: 0; } pre { overflow: auto; background: #f1f5f4; padding: 16px; max-height: 400px; font-size: 13px; } details { padding: 10px 0; border-bottom: 1px solid #e0e8e5; } summary { cursor: pointer; overflow-wrap: anywhere; } .approval { padding: 12px 0; border-bottom: 1px solid #e0e8e5; } code { background: #e7f2ee; padding: 2px 5px; }
+@media (max-width: 700px) { header { align-items: flex-start; flex-direction: column; } section { padding: 16px; } }

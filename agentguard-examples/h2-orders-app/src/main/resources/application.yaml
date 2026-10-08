@@ -1,0 +1,24 @@
+debug: false
+server:
+  address: 127.0.0.1
+  port: 8080
+spring:
+  datasource:
+    url: jdbc:h2:mem:agentguard;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ""
+  sql:
+    init:
+      mode: always
+  jackson:
+    serialization:
+      indent-output: true
+agentguard:
+  policy-location: classpath:agentguard-policy.yaml
+  environment: development
+  audit:
+    sensitive-keys: [customerEmail, internalNote]
+    mask-token: "[HIDDEN]"
+logging:
+  level:
+    org.springframework: INFO

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AgentGuard | Orders lab</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+<header><div><small>AGENTGUARD / LIVE SQL DEMO</small><h1>Orders lab</h1></div>
+  <div><span id="identity">Loading session...</span> <button id="logout">Switch user</button></div></header>
+<main>
+  <p class="intro">Real H2 queries. Policy decisions before execution. Sanitized audit records after every evaluation.</p>
+  <p>Demo accounts: <strong>developer</strong>, <strong>operator</strong>, <strong>approver</strong>, <strong>auditor</strong>.
+    All use password <code>demo-pass</code>. Data resets when the app restarts.</p>
+  <section>
+    <h2>1. Choose a database</h2>
+    <div class="controls"><select id="database" aria-label="Database">
+      <option value="orders-dev">Development / orders-dev</option>
+      <option value="orders-prod">Production / orders-prod</option>
+    </select><button id="load">Load orders</button></div>
+    <p class="hint">Developers are denied production access. Operators can read both databases; production refunds enter the approval queue.</p>
+    <div class="table-wrap"><table><thead><tr><th>ID</th><th>Product</th><th>Amount</th><th>Status</th><th>Actions</th></tr></thead><tbody id="orders"></tbody></table></div>
+  </section>
+  <section>
+    <h2>2. Create an order &amp; inspect redaction</h2>
+    <p class="hint">Customer email and internal notes use custom sensitive keys. Passwords, nested tokens and API keys use built-in matching. Demo secrets are not stored in the order table.</p>
+    <label for="payload">Request JSON</label><textarea id="payload" spellcheck="false">{
+  "product": "Agent workspace",
+  "customerEmail": "buyer@example.test",
+  "amount": 39.00,
+  "password": "demo-password",
+  "internalNote": "private customer note",
+  "integration": {"api_key": "nested-secret", "region": "local"},
+  "attempts": [{"token": "list-secret", "result": "demo"}]
+}</textarea><button id="create">Create in selected database</button>
+  </section>
+  <section>
+    <div class="section-head"><h2>3. Approval queue</h2><button id="refresh-approvals">Refresh</button></div>
+    <p class="hint">Request a production refund as operator, then sign in as approver. Approving executes the SQL update once, inside a transaction.</p>
+    <div id="approvals"></div>
+  </section>
+  <section>
+    <div class="section-head"><h2>4. Audit trail</h2><button id="refresh-audit">Refresh</button></div>
+    <p class="hint">Latest 100 sanitized events stored in H2. An ALLOW event records authorization, not proof that SQL committed.</p>
+    <p id="audit-count"></p><div id="audit"></div>
+  </section>
+  <section><h2>5. Core policy engine</h2>
+    <p>Evaluate fixed examples for an expired identity, direct permission, delegated identity metadata, and default denial. These previews execute no business SQL.</p>
+    <button id="preview">Run policy previews</button>
+    <p class="hint">Delegation lineage is recorded; version 0.1.0 does not enforce parent-to-child permission bounds.</p>
+  </section>
+  <section aria-live="polite"><h2>Last response</h2><pre id="response">Choose an action to begin.</pre></section>
+</main>
+</body>
+</html>

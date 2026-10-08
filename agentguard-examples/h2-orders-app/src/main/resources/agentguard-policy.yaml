@@ -1,0 +1,47 @@
+version: "1.0"
+metadata:
+  name: h2-order-governance
+roles:
+  developer:
+    permissions: [orders.read, orders.create, orders.refund, audit.read, approvals.read, policy.preview]
+  operator:
+    permissions: [orders.*, audit.read, approvals.read, policy.preview]
+  approver:
+    permissions: [orders.read, refunds.approve, approvals.read, audit.read, policy.preview]
+  auditor:
+    permissions: [audit.read, approvals.read, policy.preview]
+rules:
+  - id: developer-production-denied
+    effect: DENY
+    target:
+      roles: [developer]
+      actions: [orders.*]
+      conditions:
+        environment:
+          equals: production
+  - id: no-production-delete
+    effect: DENY
+    target:
+      actions: [orders.delete]
+      conditions:
+        environment:
+          equals: production
+  - id: production-refund-approval
+    effect: APPROVAL_REQUIRED
+    target:
+      roles: [operator]
+      actions: [orders.refund]
+      conditions:
+        environment:
+          equals: production
+  - id: auditor-development-read
+    effect: ALLOW
+    target:
+      roles: [auditor]
+      actions: [orders.read]
+      resources:
+        type: database
+        id: orders-dev
+      conditions:
+        environment:
+          in: [development]

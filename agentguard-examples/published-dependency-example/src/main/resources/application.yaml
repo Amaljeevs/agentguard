@@ -1,0 +1,6 @@
+spring:
+  main:
+    web-application-type: none
+agentguard:
+  policy-location: classpath:agentguard-policy.yaml
+  environment: development

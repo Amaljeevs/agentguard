@@ -64,6 +64,15 @@ Existing protocols like OAuth and OIDC answer **who authenticated the connection
 
 ## Quick Start (Spring Boot & MCP)
 
+For a runnable SQL-backed app with a browser dashboard, seeded H2 database,
+authenticated demo accounts, refund approvals, and sanitized audit history, see
+[the H2 orders app](agentguard-examples/h2-orders-app/README.md).
+
+For a complete project that consumes the **published Maven Central release**, see
+[the standalone published dependency example](agentguard-examples/published-dependency-example/README.md).
+It demonstrates allowed, denied, and approval-required calls, audit redaction, and
+MCP error mapping without building or installing AgentGuard locally.
+
 ### 1. Add Maven Dependency
 
 ```xml
