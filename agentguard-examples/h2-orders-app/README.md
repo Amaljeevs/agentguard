@@ -52,6 +52,8 @@ databases (`orders-dev`, `orders-prod`) are seeded partitions in one H2 database
    latest `orders.create` audit entry: password, customer email, internal note,
    nested API key, and token inside a list are `[HIDDEN]`. Non-sensitive fields
    such as product and integration region remain visible.
+   The terminal also prints these sanitized fields as a single-line JSON audit
+   record under logger `io.agentguard.orders.audit.json`.
 3. Select production and load orders: HTTP 403 with AgentGuard error `-32003`.
    The SQL query in the guarded service never executes.
 4. Switch to **operator**, load production orders and click Refund: HTTP 202,
@@ -91,7 +93,7 @@ provide the application infrastructure; no custom Maven repository is needed.
 | --- | --- |
 | `agentguard-core` | Policy engine, identity types, roles/direct permissions, wildcard matching, environment/resource conditions, DENY precedence, ALLOW rules, default denial, expiry, decision explanations, delegation/session metadata |
 | `agentguard-policy` | Classpath YAML loading and compilation by the starter; policy rules in `agentguard-policy.yaml` |
-| `agentguard-audit` | Recursive map/list sanitization, built-in key normalization, custom sensitive keys and mask, SQL publisher, SLF4J publisher, in-memory publisher, composite fan-out |
+| `agentguard-audit` | Recursive map/list sanitization, built-in key normalization, custom sensitive keys and mask, SQL publisher, SLF4J summary publisher, sanitized JSON console publisher, in-memory publisher, composite fan-out |
 | `agentguard-spring` | `@AgentAuthorize`, AOP interception, SpEL resource/environment extraction, authenticated Spring Security principal to agent identity |
 | `agentguard-spring-boot-starter` | Automatic policy engine/resolver/sanitizer configuration, configuration properties, custom audit publisher override |
 | `agentguard-mcp` | Published exception mapper for access-denied and approval-required error objects in HTTP responses |
@@ -108,7 +110,7 @@ Browser or API client
   -> Controller resolves trusted resource/environment
   -> Spring proxy / @AgentAuthorize
      -> Identity resolver -> YAML policy engine
-     -> Sanitized audit -> H2 + in-memory + SLF4J
+     -> Sanitized audit -> H2 + in-memory + SLF4J summary + JSON console log
      -> ALLOW: parameterized SQL executes
      -> DENY: HTTP 403, no business mutation
      -> APPROVAL_REQUIRED: queue request, HTTP 202, no refund yet
@@ -125,6 +127,38 @@ The approval queue is **application code**, not a built-in library workflow.
 `ApprovalService` authorizes the distinct `refunds.approve` action, prevents
 self-approval, locks the approval row, and updates the order plus request in one
 transaction. It does not bypass authorization or temporarily change the policy.
+
+### How log sanitization works
+
+The published starter supplies `ParameterSanitizer` from `agentguard-audit`.
+The authorization aspect uses it when constructing `AuditEvent`, before the
+event reaches any configured publisher. `AuditConfiguration` fans out the event
+to SQL, memory, the library's decision-summary logger, and the example's
+`SanitizedAuditLogPublisher`.
+
+The JSON console publisher applies that same configured sanitizer to parameters
+again at the log boundary, including for manually constructed events. It writes
+only the sanitized parameters and selected decision metadata, using JSON escaping
+and one physical line per event. Allowed decisions use INFO; blocked decisions
+use WARN. Serialization failures emit a fixed message without raw input or
+exception text.
+
+For example, an input parameter map containing:
+
+```json
+{"password":"demo-secret","integration":{"api_key":"nested-secret","region":"local"}}
+```
+
+appears in the audit log's `parameters` field as:
+
+```json
+{"password":"[HIDDEN]","integration":{"api_key":"[HIDDEN]","region":"local"}}
+```
+
+Configure additional sensitive keys and the mask through `agentguard.audit` in
+`application.yaml`. This sanitizes the structured audit log path; it is not a
+global filter for arbitrary `log.info(...)` calls or third-party HTTP/SQL debug
+logs. Do not log raw request bodies, authentication headers, or secret values.
 
 ## API
 
@@ -151,6 +185,9 @@ receive 401; missing CSRF tokens receive 403 before AgentGuard runs.
 CSRF, role/resource/environment rules, SQL changes, blocked mutations, recursive
 redaction, custom sensitive fields, SQL injection treated as literal input,
 approval workflow and replay protection, expiry and delegation audit metadata.
+`AuditLogTest` captures emitted log messages and checks redaction for allowed and
+denied requests, manually published events, newline escaping, and serialization
+failure handling.
 
 Version 0.1.0's sanitizer traverses maps/lists and matches sensitive key names;
 it does not inspect arbitrary DTO fields or scrub secrets embedded in free-form
@@ -170,5 +207,5 @@ permission-bound enforcement, risk scoring, OpenTelemetry/SIEM publishers, or
 health endpoints. The example does not claim those as library capabilities.
 
 Source entry points: `SecurityConfiguration`, `OrderService`, `ApprovalService`,
-`AuditConfiguration`, `InspectionService`, and `OrdersAppTest`. No local library
+`AuditConfiguration`, `SanitizedAuditLogPublisher`, `InspectionService`, and `OrdersAppTest`. No local library
 source changes or unpublished APIs are required.

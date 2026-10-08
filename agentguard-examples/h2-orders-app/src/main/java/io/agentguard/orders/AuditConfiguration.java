@@ -5,6 +5,7 @@ import io.agentguard.audit.publisher.AuditEventPublisher;
 import io.agentguard.audit.publisher.CompositeAuditEventPublisher;
 import io.agentguard.audit.publisher.InMemoryAuditEventPublisher;
 import io.agentguard.audit.publisher.Slf4jAuditEventPublisher;
+import io.agentguard.audit.sanitizer.ParameterSanitizer;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -18,7 +19,8 @@ public class AuditConfiguration {
 
     @Bean
     @Primary
-    AuditEventPublisher auditPublisher(JdbcTemplate jdbc, ObjectMapper mapper, InMemoryAuditEventPublisher recentAudit) {
+    AuditEventPublisher auditPublisher(JdbcTemplate jdbc, ObjectMapper mapper,
+                                      InMemoryAuditEventPublisher recentAudit, ParameterSanitizer sanitizer) {
         AuditEventPublisher sqlPublisher = event -> {
             try {
                 jdbc.update("INSERT INTO audit_event (event_id, event_json) VALUES (?, ?)",
@@ -30,6 +32,7 @@ public class AuditConfiguration {
                 throw new IllegalStateException("Audit persistence failed", exception);
             }
         };
-        return CompositeAuditEventPublisher.of(sqlPublisher, recentAudit, new Slf4jAuditEventPublisher());
+        return CompositeAuditEventPublisher.of(sqlPublisher, recentAudit, new Slf4jAuditEventPublisher(),
+            new SanitizedAuditLogPublisher(mapper, sanitizer));
     }
 }
