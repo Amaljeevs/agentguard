@@ -16,6 +16,10 @@
     <name>AgentGuard :: Examples :: Spring MCP Server</name>
     <description>Working Spring Boot 3 Model Context Protocol (MCP) server secured with AgentGuard.</description>
 
+    <properties>
+        <maven.deploy.skip>true</maven.deploy.skip>
+    </properties>
+
     <dependencies>
         <!-- AgentGuard Spring Boot Starter -->
         <dependency>
