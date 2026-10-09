@@ -35,9 +35,7 @@ jobs:
       - name: Import GPG Key
         env:
           GPG_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
-        run: |
-          echo "$GPG_KEY" | gpg --batch --import
-          gpg --list-secret-keys
+        run: python3 .github/scripts/import_gpg_key.py
 
       - name: Publish with Maven Central Plugin
         env:

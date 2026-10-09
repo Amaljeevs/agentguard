@@ -211,6 +211,11 @@ To publish through GitHub Actions, run **Publish to Maven Central** on the updat
 Re-running an older failed workflow uses its original commit, which may still
 contain a SNAPSHOT version. The workflow intentionally rejects those versions.
 
+Set the `GPG_PRIVATE_KEY` Actions secret to the complete ASCII-armored private
+key export, including its BEGIN/END lines. The import step accepts actual line
+breaks or literal `\n` sequences and rejects malformed keys without logging
+their contents. Never paste private keys into issues or build logs.
+
 ## License
 
 [Apache License 2.0](LICENSE). Copyright (c) 2026 Amal Jeev S.
