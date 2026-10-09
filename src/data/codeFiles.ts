@@ -602,7 +602,7 @@ class SpringMcpExampleApplicationTest {
 <dependency>
     <groupId>io.github.amaljeevs</groupId>
     <artifactId>agentguard-spring-boot-starter</artifactId>
-    <version>0.1.0</version>
+    <version>0.2.0</version>
 </dependency>
 
 ## 2. Define Policy (agentguard-policy.yaml)
@@ -651,9 +651,9 @@ public QueryResult queryDatabase(String query) { ... }`
     language: 'xml',
     description: 'Maven multi-module aggregator and build configuration for Java 21 with source/javadoc plugins.',
     content: `<project>
-    <groupId>io.agentguard</groupId>
+    <groupId>io.github.amaljeevs</groupId>
     <artifactId>agentguard-parent</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>0.2.0</version>
     <packaging>pom</packaging>
     <modules>
         <module>agentguard-core</module>
@@ -662,6 +662,8 @@ public QueryResult queryDatabase(String query) { ... }`
         <module>agentguard-spring</module>
         <module>agentguard-spring-boot-starter</module>
         <module>agentguard-mcp</module>
+        <module>agentguard-approval</module>
+        <module>agentguard-spring-ai</module>
     </modules>
 </project>`
   }
