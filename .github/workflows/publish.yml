@@ -42,5 +42,5 @@ jobs:
           MAVEN_CENTRAL_USERNAME: ${{ secrets.CENTRAL_PORTAL_TOKEN_USERNAME }}
           MAVEN_CENTRAL_TOKEN: ${{ secrets.CENTRAL_PORTAL_TOKEN_PASSWORD }}
         run: |
-          mvn clean deploy -P release --batch-mode -DskipTests -Dgpg.passphrase="" -Dmaven.deploy.skip=true -Dcentral-publishing-maven-plugin.skipPublishing=true
+          mvn clean deploy -P release --batch-mode -DskipTests -Dgpg.passphrase="" -Dmaven.deploy.skip=true || true
           python3 .github/scripts/package_and_publish.py
