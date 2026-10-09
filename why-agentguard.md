@@ -58,10 +58,10 @@ see [Spring AI MCP server documentation](https://docs.spring.io/spring-ai/refere
 ## What is implemented
 
 **Version boundary:** Maven Central currently has `0.1.0`. This repository's new
-capabilities are `0.2.0-SNAPSHOT` development code and require a local build until
+capabilities are `0.2.0` development code and require a local build until
 a release is published. See [CHANGELOG.md](CHANGELOG.md) for migration details.
 
-| Capability | Published 0.1.0 | Development 0.2.0-SNAPSHOT |
+| Capability | Published 0.1.0 | Development 0.2.0 |
 | --- | --- | --- |
 | Java 21 core; roles, direct permissions, wildcard matching | Yes | Yes |
 | Environment/resource rules; explicit deny precedence | Yes | Yes |

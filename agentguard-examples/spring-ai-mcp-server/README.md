@@ -1,6 +1,6 @@
 # Spring AI + real MCP transport + reusable approvals
 
-This example exercises **0.2.0-SNAPSHOT development code**, not the published
+This example exercises **0.2.0 development code**, not the published
 0.1.0 release. It uses Spring Boot 3.5.7, Spring AI 1.1.0, MCP Java SDK 0.16.0,
 Java 21, Spring Security HTTP Basic, H2, and the optional AgentGuard approval and
 Spring AI modules. No LLM, API key, Docker, or external database is needed.

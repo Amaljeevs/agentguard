@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.0-SNAPSHOT — unreleased
+## 0.2.0 — prepared for release; publication pending
 
 ### Security and behavior changes
 
@@ -42,7 +42,7 @@
 - Set `agentguard.audit.failure-mode=BEST_EFFORT` only if continuing without a
   successful audit write is acceptable. A post-execution publication failure can
   surface after a side effect; applications still need idempotency.
-- No new artifacts have been published. Build this snapshot locally; the two
+- Publication is pending. Build this version locally until it is available; the two
   published-dependency examples remain pinned to 0.1.0 and demonstrate that release.
 
 ## 0.1.0

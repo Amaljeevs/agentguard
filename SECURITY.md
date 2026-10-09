@@ -12,7 +12,7 @@ We will coordinate investigation, fixes, and disclosure with the reporter.
 
 | Version | Status |
 | --- | --- |
-| 0.2.0-SNAPSHOT | Unreleased development code; contains the hardening described below |
+| 0.2.0 | Unreleased development code; contains the hardening described below |
 | 0.1.0 | Published initial release; does not include the new hardening or approval/Spring AI modules |
 | Older versions | Unsupported pre-release builds |
 

@@ -2,7 +2,7 @@
 
 This document describes the declarative format implemented by the Java runtime.
 The format can inform future ports; Python, TypeScript and Go runtimes are not
-implemented. Semantics below describe 0.2.0-SNAPSHOT; 0.1.0 evaluates approval
+implemented. Semantics below describe 0.2.0; 0.1.0 evaluates approval
 rules before grants and does not enforce delegation ancestry.
 
 ---

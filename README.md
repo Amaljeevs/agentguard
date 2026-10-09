@@ -13,7 +13,7 @@ Read [why-agentguard.md](why-agentguard.md) for the comparison, supported use ca
 and future directions.
 
 **Release status:** `0.1.0` is published on Maven Central. The code on this branch
-is **`0.2.0-SNAPSHOT`, unreleased**. New approval and Spring AI modules require a
+is **`0.2.0`, prepared for release; publication pending**. New approval and Spring AI modules require a
 local build. See [CHANGELOG.md](CHANGELOG.md) for behavior changes and migration.
 
 ## Try a runnable app
@@ -62,13 +62,13 @@ modules and propagates authenticated identity over real Streamable HTTP MCP.
 
 ## Integrate the development starter
 
-After installing the snapshot locally, add this dependency to a Spring Boot app:
+Until 0.2.0 is published, install it locally, then add this dependency to a Spring Boot app:
 
 ```xml
 <dependency>
     <groupId>io.github.amaljeevs</groupId>
     <artifactId>agentguard-spring-boot-starter</artifactId>
-    <version>0.2.0-SNAPSHOT</version>
+    <version>0.2.0</version>
 </dependency>
 ```
 
@@ -203,8 +203,13 @@ Report vulnerabilities privately using [SECURITY.md](SECURITY.md).
 
 The group ID is `io.github.amaljeevs`. Publishing is a maintainer release action:
 select an unused non-SNAPSHOT release version, run all checks, configure Central
-credentials/signing, then use `mvn clean deploy -P release`. The current snapshot
-has not been deployed, and the existing 0.1.0 artifacts are not overwritten.
+credentials/signing, then use `mvn clean deploy -P release`. Version `0.2.0` is
+prepared for publishing; this does not itself deploy artifacts or overwrite 0.1.0.
+
+To publish through GitHub Actions, run **Publish to Maven Central** on the updated
+`main` branch, or publish a release whose tag points to the release-version commit.
+Re-running an older failed workflow uses its original commit, which may still
+contain a SNAPSHOT version. The workflow intentionally rejects those versions.
 
 ## License
 

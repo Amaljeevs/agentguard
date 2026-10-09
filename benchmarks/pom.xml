@@ -2,11 +2,11 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
-    <groupId>io.agentguard.benchmarks</groupId><artifactId>policy-benchmarks</artifactId><version>0.2.0-SNAPSHOT</version>
+    <groupId>io.agentguard.benchmarks</groupId><artifactId>policy-benchmarks</artifactId><version>0.2.0</version>
     <properties><maven.compiler.release>21</maven.compiler.release><project.build.sourceEncoding>UTF-8</project.build.sourceEncoding></properties>
     <dependencies>
-        <dependency><groupId>io.github.amaljeevs</groupId><artifactId>agentguard-core</artifactId><version>0.2.0-SNAPSHOT</version></dependency>
-        <dependency><groupId>io.github.amaljeevs</groupId><artifactId>agentguard-audit</artifactId><version>0.2.0-SNAPSHOT</version></dependency>
+        <dependency><groupId>io.github.amaljeevs</groupId><artifactId>agentguard-core</artifactId><version>0.2.0</version></dependency>
+        <dependency><groupId>io.github.amaljeevs</groupId><artifactId>agentguard-audit</artifactId><version>0.2.0</version></dependency>
         <dependency><groupId>org.openjdk.jmh</groupId><artifactId>jmh-core</artifactId><version>1.37</version></dependency>
         <dependency><groupId>org.openjdk.jmh</groupId><artifactId>jmh-generator-annprocess</artifactId><version>1.37</version><scope>provided</scope></dependency>
     </dependencies>
