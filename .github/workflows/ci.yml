@@ -23,17 +23,17 @@ jobs:
           cache: 'maven'
 
       - name: Build with Maven
-        run: mvn clean install --batch-mode --no-transfer-progress
+        run: ./mvnw clean install --batch-mode --no-transfer-progress
 
       - name: Test signing-key input handling
         run: python3 -B .github/scripts/test_import_gpg_key.py
 
       - name: Verify candidate over real MCP transport
-        run: mvn -f agentguard-examples/spring-ai-mcp-server/pom.xml verify --batch-mode --no-transfer-progress
+        run: ./mvnw -f agentguard-examples/spring-ai-mcp-server/pom.xml verify --batch-mode --no-transfer-progress
 
       - name: Test declarative policy scenarios
         run: >-
-          mvn -f agentguard-policy/pom.xml org.codehaus.mojo:exec-maven-plugin:3.5.0:java
+          ./mvnw -f agentguard-policy/pom.xml org.codehaus.mojo:exec-maven-plugin:3.5.0:java
           -Dexec.mainClass=io.agentguard.policy.testing.PolicyTestCli
           '-Dexec.args=agentguard-examples/spring-ai-mcp-server/src/main/resources/agentguard-policy.yaml specification/examples/policy-scenarios.json'
 
@@ -51,4 +51,4 @@ jobs:
           java-version: '21'
           cache: maven
       - name: Resolve and test the published release independently
-        run: mvn -f agentguard-examples/${{ matrix.example }}/pom.xml clean verify --batch-mode --no-transfer-progress
+        run: ./mvnw -f agentguard-examples/${{ matrix.example }}/pom.xml clean verify --batch-mode --no-transfer-progress

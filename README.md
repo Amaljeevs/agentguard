@@ -203,7 +203,8 @@ Report vulnerabilities privately using [SECURITY.md](SECURITY.md).
 
 The group ID is `io.github.amaljeevs`. Publishing is a maintainer release action:
 select an unused non-SNAPSHOT release version, run all checks, configure Central
-credentials/signing, then use `mvn clean deploy -P release`. Version `0.2.0` is
+credentials/signing, then use `./mvnw clean deploy -P release` (Windows:
+`./mvnw.cmd clean deploy -P release`). Version `0.2.0` is
 prepared for publishing; this does not itself deploy artifacts or overwrite 0.1.0.
 
 To publish through GitHub Actions, run **Publish to Maven Central** on the updated
@@ -215,6 +216,11 @@ Set the `GPG_PRIVATE_KEY` Actions secret to the complete ASCII-armored private
 key export, including its BEGIN/END lines. The import step accepts actual line
 breaks or literal `\n` sequences and rejects malformed keys without logging
 their contents. Never paste private keys into issues or build logs.
+
+CI and publishing use the Maven wrapper pinned to 3.9.9. Use the wrapper for
+releases: Maven 3.10 can leave `maven-metadata-local.xml` in the publishing
+plugin's staging directory, producing Central's misleading missing-POM error.
+A failed publish preserves the bundle as a workflow artifact for inspection.
 
 ## License
 
