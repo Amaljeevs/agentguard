@@ -14,6 +14,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 
 /**
  * Immutable audit record representing an evaluated authorization decision.
@@ -48,12 +50,12 @@ public record AuditEvent(
         Objects.requireNonNull(reason, "reason must not be null");
 
         roles = roles == null ? Set.of() : Set.copyOf(roles);
-        parameters = parameters == null ? Map.of() : Map.copyOf(parameters);
+        parameters = parameters == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(parameters));
         matchedPolicyName = matchedPolicyName == null ? Optional.empty() : matchedPolicyName;
         matchedRuleId = matchedRuleId == null ? Optional.empty() : matchedRuleId;
         delegatedBy = delegatedBy == null ? Optional.empty() : delegatedBy;
         sessionId = sessionId == null ? Optional.empty() : sessionId;
-        metadata = metadata == null ? Map.of() : Map.copyOf(metadata);
+        metadata = metadata == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(metadata));
     }
 
     /**
@@ -89,7 +91,19 @@ public record AuditEvent(
             decision.matchedRuleId(),
             subject != null ? subject.delegatedBy() : Optional.empty(),
             subject != null ? subject.sessionId() : Optional.empty(),
-            request.context().metadata()
+            activeSanitizer.sanitize(request.context().metadata())
         );
+    }
+
+    /** Adds trusted lifecycle metadata while retaining the sanitized request snapshot. */
+    public AuditEvent lifecycle(String phase, String correlationId, String policyRevision, Map<String, Object> details) {
+        var extra = new LinkedHashMap<>(metadata);
+        extra.putAll(details);
+        extra.put("phase", phase);
+        extra.put("correlationId", correlationId);
+        extra.put("policyRevision", policyRevision);
+        return new AuditEvent(UUID.randomUUID().toString(), Instant.now(), agentId, agentType, roles, action,
+            parameters, resourceType, resourceId, environment, decision, reason, matchedPolicyName,
+            matchedRuleId, delegatedBy, sessionId, extra);
     }
 }

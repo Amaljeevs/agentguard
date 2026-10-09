@@ -8,7 +8,7 @@
     <parent>
         <groupId>io.github.amaljeevs</groupId>
         <artifactId>agentguard-parent</artifactId>
-        <version>0.1.0</version>
+        <version>0.2.0-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
@@ -17,6 +17,10 @@
     <description>Structured, immutable audit events, sensitive parameter masking, and AuditEventPublisher SPI.</description>
 
     <dependencies>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
         <!-- Internal core module -->
         <dependency>
             <groupId>io.github.amaljeevs</groupId>
@@ -30,6 +34,12 @@
         </dependency>
 
         <!-- Testing -->
+        <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
+            <version>1.5.8</version>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>

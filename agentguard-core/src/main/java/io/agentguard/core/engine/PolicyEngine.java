@@ -16,4 +16,7 @@ public interface PolicyEngine {
      * @return the authorization decision with explanatory reason and rule provenance
      */
     AuthorizationDecision evaluate(AuthorizationRequest request);
+
+    /** Content revision used to bind approvals and audit events to an exact policy. */
+    default String revision() { return "unversioned"; }
 }

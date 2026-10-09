@@ -64,9 +64,13 @@ public class AgentGuardProperties {
     }
 
     public static class AuditProperties {
+        private io.agentguard.audit.publisher.AuditFailureMode failureMode = io.agentguard.audit.publisher.AuditFailureMode.FAIL_CLOSED;
         private boolean enabled = true;
         private String maskToken = "[REDACTED]";
         private List<String> sensitiveKeys = new ArrayList<>();
+
+        public io.agentguard.audit.publisher.AuditFailureMode getFailureMode() { return failureMode; }
+        public void setFailureMode(io.agentguard.audit.publisher.AuditFailureMode failureMode) { this.failureMode = failureMode; }
 
         public boolean isEnabled() {
             return enabled;

@@ -47,7 +47,7 @@ public record AgentIdentity(
      */
     public boolean isExpired(Instant now) {
         Objects.requireNonNull(now, "Reference instant must not be null");
-        return now.isAfter(expiresAt);
+        return !now.isBefore(expiresAt);
     }
 
     public static Builder builder() {

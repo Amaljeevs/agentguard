@@ -1,0 +1,13 @@
+debug: false
+server:
+  address: 127.0.0.1
+  port: 8082
+spring:
+  datasource:
+    url: jdbc:h2:mem:mcp-orders;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ""
+agentguard:
+  audit:
+    mask-token: "[HIDDEN]"
+    sensitive-keys: [customerEmail]

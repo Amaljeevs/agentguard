@@ -8,7 +8,7 @@
     <parent>
         <groupId>io.github.amaljeevs</groupId>
         <artifactId>agentguard-parent</artifactId>
-        <version>0.1.0</version>
+        <version>0.2.0-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
@@ -17,6 +17,16 @@
     <description>Spring Boot 3 starter providing auto-configuration for AgentGuard authorization and governance.</description>
 
     <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aop</artifactId>
+            <version>${spring-boot.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-core</artifactId>
+            <version>6.3.3</version>
+        </dependency>
         <!-- AgentGuard modules -->
         <dependency>
             <groupId>io.github.amaljeevs</groupId>

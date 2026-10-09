@@ -1,0 +1,26 @@
+version: "1.0"
+metadata:
+  name: mcp-orders
+roles:
+  developer:
+    permissions: [orders.read, orders.refund]
+  operator:
+    permissions: [orders.*]
+  approver:
+    permissions: [orders.read, agentguard.approval.approve]
+rules:
+  - id: no-developer-production
+    effect: DENY
+    target:
+      roles: [developer]
+      actions: [orders.*]
+      conditions:
+        environment:
+          equals: production
+  - id: production-refund-review
+    effect: APPROVAL_REQUIRED
+    target:
+      actions: [orders.refund]
+      conditions:
+        environment:
+          equals: production

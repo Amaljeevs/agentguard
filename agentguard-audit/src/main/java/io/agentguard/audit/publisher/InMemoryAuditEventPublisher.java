@@ -1,35 +1,23 @@
 package io.agentguard.audit.publisher;
 
 import io.agentguard.audit.model.AuditEvent;
+import java.util.*;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
-
-/**
- * Thread-safe in-memory implementation of {@link AuditEventPublisher} capturing events for testing and inspection.
- */
+/** Bounded, thread-safe recent-event buffer for tests and inspection; not a durable audit store. */
 public class InMemoryAuditEventPublisher implements AuditEventPublisher {
-
-    private final List<AuditEvent> events = new CopyOnWriteArrayList<>();
-
-    @Override
-    public void publish(AuditEvent event) {
-        if (event != null) {
-            events.add(event);
-        }
+    private final Deque<AuditEvent> events = new ArrayDeque<>();
+    private final int capacity;
+    public InMemoryAuditEventPublisher() { this(10_000); }
+    public InMemoryAuditEventPublisher(int capacity) {
+        if (capacity < 1) throw new IllegalArgumentException("capacity must be positive");
+        this.capacity = capacity;
     }
-
-    public List<AuditEvent> getEvents() {
-        return Collections.unmodifiableList(new ArrayList<>(events));
+    @Override public synchronized void publish(AuditEvent event) {
+        if (event == null) return;
+        if (events.size() == capacity) events.removeFirst();
+        events.addLast(event);
     }
-
-    public void clear() {
-        events.clear();
-    }
-
-    public int size() {
-        return events.size();
-    }
+    public synchronized List<AuditEvent> getEvents() { return List.copyOf(events); }
+    public synchronized void clear() { events.clear(); }
+    public synchronized int size() { return events.size(); }
 }

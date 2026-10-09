@@ -23,15 +23,24 @@ jobs:
           server-username: MAVEN_CENTRAL_USERNAME
           server-password: MAVEN_CENTRAL_TOKEN
 
+      - name: Require a release version
+        shell: bash
+        run: |
+          version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          if [[ "$version" == *SNAPSHOT* ]]; then
+            echo "Set a release version before publishing to Maven Central."
+            exit 1
+          fi
+
       - name: Import GPG Key
         env:
           GPG_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
         run: |
-          echo "$GPG_KEY" | gpg --batch --import || true
+          echo "$GPG_KEY" | gpg --batch --import
           gpg --list-secret-keys
 
       - name: Publish with Maven Central Plugin
         env:
           MAVEN_CENTRAL_USERNAME: ${{ secrets.CENTRAL_PORTAL_TOKEN_USERNAME }}
           MAVEN_CENTRAL_TOKEN: ${{ secrets.CENTRAL_PORTAL_TOKEN_PASSWORD }}
-        run: mvn clean deploy -P release --batch-mode -DskipTests -Dgpg.passphrase=""
+        run: mvn clean deploy -P release --batch-mode -Dgpg.passphrase=""

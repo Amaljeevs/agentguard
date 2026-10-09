@@ -1,17 +1,15 @@
 package io.agentguard.spring.aop;
 
-import io.agentguard.audit.model.AuditEvent;
+import io.agentguard.audit.execution.AuthorizationExecutor;
 import io.agentguard.audit.publisher.AuditEventPublisher;
 import io.agentguard.audit.sanitizer.DefaultParameterSanitizer;
 import io.agentguard.audit.sanitizer.ParameterSanitizer;
 import io.agentguard.core.engine.PolicyEngine;
 import io.agentguard.core.exception.AgentAccessDeniedException;
-import io.agentguard.core.exception.AgentApprovalRequiredException;
 import io.agentguard.core.identity.AgentIdentityResolver;
 import io.agentguard.core.model.Action;
 import io.agentguard.core.model.AgentIdentity;
 import io.agentguard.core.model.AuthorizationContext;
-import io.agentguard.core.model.AuthorizationDecision;
 import io.agentguard.core.model.AuthorizationRequest;
 import io.agentguard.core.model.Resource;
 import io.agentguard.spring.annotation.AgentAuthorize;
@@ -21,6 +19,8 @@ import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.reflect.MethodSignature;
 import org.springframework.core.DefaultParameterNameDiscoverer;
 import org.springframework.core.ParameterNameDiscoverer;
+import org.springframework.aop.support.AopUtils;
+import org.springframework.context.expression.MethodBasedEvaluationContext;
 import org.springframework.expression.EvaluationContext;
 import org.springframework.expression.ExpressionParser;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
@@ -67,7 +67,7 @@ public class AgentAuthorizationAspect {
     @Around("@annotation(agentAuthorize)")
     public Object authorizeMethod(ProceedingJoinPoint joinPoint, AgentAuthorize agentAuthorize) throws Throwable {
         MethodSignature signature = (MethodSignature) joinPoint.getSignature();
-        Method method = signature.getMethod();
+        Method method = AopUtils.getMostSpecificMethod(signature.getMethod(), joinPoint.getTarget().getClass());
         Object[] args = joinPoint.getArgs();
 
         // 1. Resolve active AgentIdentity
@@ -102,32 +102,8 @@ public class AgentAuthorizationAspect {
             AuthorizationContext.of(environment)
         );
 
-        // 6. Evaluate decision via pure PDP
-        AuthorizationDecision decision = policyEngine.evaluate(request);
-
-        // 7. Publish audit record
-        AuditEvent auditEvent = AuditEvent.from(request, decision, parameterSanitizer);
-        auditPublisher.publish(auditEvent);
-
-        // 8. Enforce decision outcome
-        if (decision.isDenied()) {
-            String ruleSuffix = decision.matchedRuleId().map(r -> " [rule: " + r + "]").orElse("");
-            throw new AgentAccessDeniedException(
-                String.format("AgentGuard authorization DENIED: %s%s", decision.reason(), ruleSuffix),
-                decision
-            );
-        }
-
-        if (decision.isApprovalRequired()) {
-            String ruleSuffix = decision.matchedRuleId().map(r -> " [rule: " + r + "]").orElse("");
-            throw new AgentApprovalRequiredException(
-                String.format("AgentGuard APPROVAL_REQUIRED: %s%s", decision.reason(), ruleSuffix),
-                decision
-            );
-        }
-
-        // 9. ALLOW: proceed with method execution
-        return joinPoint.proceed();
+        return new AuthorizationExecutor(policyEngine, auditPublisher, parameterSanitizer)
+            .execute(request, joinPoint::proceed);
     }
 
     private Map<String, Object> extractParameters(Method method, Object[] args) {
@@ -142,7 +118,8 @@ public class AgentAuthorizationAspect {
     }
 
     private EvaluationContext createEvaluationContext(Method method, Object[] args) {
-        StandardEvaluationContext context = new StandardEvaluationContext();
+        StandardEvaluationContext context = new MethodBasedEvaluationContext(
+            null, method, args, paramNameDiscoverer);
         String[] paramNames = paramNameDiscoverer.getParameterNames(method);
         if (paramNames != null && args != null) {
             for (int i = 0; i < Math.min(paramNames.length, args.length); i++) {
@@ -159,9 +136,12 @@ public class AgentAuthorizationAspect {
         if (expressionStr.startsWith("#")) {
             try {
                 Object value = spelParser.parseExpression(expressionStr).getValue(context);
-                return value != null ? value.toString() : fallback;
+                if (value == null || value.toString().isBlank()) {
+                    throw new AgentAccessDeniedException("Authorization expression resolved to an empty value");
+                }
+                return value.toString();
             } catch (Exception e) {
-                return fallback;
+                throw new AgentAccessDeniedException("Cannot resolve configured authorization expression");
             }
         }
         return expressionStr;

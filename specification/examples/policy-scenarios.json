@@ -1,0 +1,6 @@
+[
+  {"name":"developer-dev-read","agentId":"developer-agent","roles":["developer"],"action":"orders.read","resourceType":"order","resourceId":"1","environment":"development","expected":"ALLOW"},
+  {"name":"developer-prod-blocked","agentId":"developer-agent","roles":["developer"],"action":"orders.read","resourceType":"order","resourceId":"2","environment":"production","expected":"DENY"},
+  {"name":"operator-refund-needs-review","agentId":"operator-agent","roles":["operator"],"action":"orders.refund","resourceType":"order","resourceId":"2","environment":"production","expected":"APPROVAL_REQUIRED"},
+  {"name":"unprivileged-refund-cannot-request-approval","agentId":"unknown","roles":[],"action":"orders.refund","resourceType":"order","resourceId":"2","environment":"production","expected":"DENY"}
+]

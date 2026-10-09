@@ -26,6 +26,9 @@ public class SpringSecurityAgentIdentityResolver implements AgentIdentityResolve
         if (auth == null || !auth.isAuthenticated()) {
             return Optional.empty();
         }
+        if (auth instanceof org.springframework.security.authentication.AnonymousAuthenticationToken) return Optional.empty();
+        // A trusted authentication provider may supply an identity with original expiry/delegation.
+        if (auth.getPrincipal() instanceof AgentIdentity identity) return Optional.of(identity);
 
         String principalName = auth.getName();
         if (principalName == null || principalName.isBlank() || "anonymousUser".equalsIgnoreCase(principalName)) {

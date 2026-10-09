@@ -10,6 +10,9 @@ import io.agentguard.core.engine.PermissionMatcher;
 import io.agentguard.core.engine.PolicyEngine;
 import io.agentguard.core.exception.InvalidPolicyException;
 import io.agentguard.core.identity.AgentIdentityResolver;
+import io.agentguard.core.identity.AgentIdentityLookup;
+import io.agentguard.audit.publisher.JsonAuditEventPublisher;
+import io.agentguard.audit.publisher.ReliableAuditEventPublisher;
 import io.agentguard.core.model.PolicySet;
 import io.agentguard.policy.loader.PolicyLoader;
 import io.agentguard.policy.loader.YamlPolicyLoader;
@@ -73,25 +76,26 @@ public class AgentGuardAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    public PolicyEngine agentGuardPolicyEngine(PolicySet policySet, PermissionMatcher permissionMatcher) {
-        return new DefaultPolicyEngine(policySet, permissionMatcher);
+    public PolicyEngine agentGuardPolicyEngine(PolicySet policySet, PermissionMatcher permissionMatcher, AgentIdentityLookup identities) {
+        return new DefaultPolicyEngine(policySet, permissionMatcher, identities);
     }
+
+    @Bean
+    @ConditionalOnMissingBean
+    public AgentIdentityLookup agentGuardIdentityLookup() { return id -> java.util.Optional.empty(); }
 
     @Bean
     @ConditionalOnMissingBean
     public ParameterSanitizer agentGuardParameterSanitizer(AgentGuardProperties properties) {
-        if (!properties.getAudit().getSensitiveKeys().isEmpty()) {
-            Set<String> keys = new HashSet<>(DefaultParameterSanitizer.DEFAULT_SENSITIVE_KEYS);
-            keys.addAll(properties.getAudit().getSensitiveKeys());
-            return new DefaultParameterSanitizer(keys, properties.getAudit().getMaskToken());
-        }
-        return new DefaultParameterSanitizer();
+        Set<String> keys = new HashSet<>(DefaultParameterSanitizer.DEFAULT_SENSITIVE_KEYS);
+        keys.addAll(properties.getAudit().getSensitiveKeys());
+        return new DefaultParameterSanitizer(keys, properties.getAudit().getMaskToken());
     }
 
     @Bean
     @ConditionalOnMissingBean
-    public AuditEventPublisher agentGuardAuditEventPublisher() {
-        return new Slf4jAuditEventPublisher();
+    public AuditEventPublisher agentGuardAuditEventPublisher(ParameterSanitizer sanitizer) {
+        return new JsonAuditEventPublisher(sanitizer);
     }
 
     @Bean
@@ -112,7 +116,8 @@ public class AgentGuardAutoConfiguration {
         return new AgentAuthorizationAspect(
             policyEngine,
             identityResolver,
-            auditPublisher,
+            properties.getAudit().isEnabled()
+                ? new ReliableAuditEventPublisher(auditPublisher, properties.getAudit().getFailureMode()) : event -> {},
             parameterSanitizer,
             properties.getEnvironment()
         );

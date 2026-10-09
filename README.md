@@ -1,225 +1,211 @@
 # AgentGuard
 
-**Open-Source Authorization and Governance for AI Agents & Model Context Protocol (MCP)**
+**Tool-level authorization, request-bound approvals, and sanitized audit trails for Java agents.**
 
+[![CI](https://github.com/Amaljeevs/agentguard/actions/workflows/ci.yml/badge.svg)](https://github.com/Amaljeevs/agentguard/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
-[![Java Version](https://img.shields.io/badge/Java-21%2B-orange.svg)](https://openjdk.org/projects/jdk/21/)
-[![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.3%2B-brightgreen.svg)](https://spring.io/projects/spring-boot)
+[![Java](https://img.shields.io/badge/Java-21%2B-orange.svg)](https://openjdk.org/projects/jdk/21/)
 
-AgentGuard is a language-neutral authorization and governance framework for AI agents interacting with MCP servers, tools, APIs, databases, and infrastructure.
+AgentGuard evaluates who may perform an action on a resource in a particular
+environment, stops denied or unapproved calls, and records structured evidence.
+It complements Spring Security's authentication and authorization facilities.
+Read [why-agentguard.md](why-agentguard.md) for the comparison, supported use cases,
+and future directions.
 
-```text
-                    AI Agents
-       Coding       DevOps       Support
-       Agent        Agent         Agent
-          │            │             │
-          └────────────┼─────────────┘
-                       │
-                Authentication (OAuth / JWT)
-                       │
-                       ▼
-              ┌─────────────────┐
-              │   AgentGuard    │
-              ├─────────────────┤
-              │ Agent Identity  │
-              │ RBAC / ABAC     │
-              │ Policy Engine   │
-              │ Delegation      │
-              │ Risk Evaluation │
-              │ Approval        │
-              │ Audit Logging   │
-              └────────┬────────┘
-                       │
-                       ▼
-                    MCP Server
-                       │
-             ┌─────────┼─────────┐
-             ▼         ▼         ▼
-            Git     Database    K8s
-```
+**Release status:** `0.1.0` is published on Maven Central. The code on this branch
+is **`0.2.0-SNAPSHOT`, unreleased**. New approval and Spring AI modules require a
+local build. See [CHANGELOG.md](CHANGELOG.md) for behavior changes and migration.
 
----
+## Try a runnable app
 
-## Why AgentGuard?
+### Published release: H2 browser dashboard
 
-Existing protocols like OAuth and OIDC answer **who authenticated the connection**. However, autonomous agents present distinct security challenges:
+With Java 21+ and Maven 3.6.3+:
 
-- **Coarse Scopes**: An OAuth token with `tools:call` allows calling any tool, with no distinction between reading logs and dropping a production database.
-- **Prompt Injection Vulnerability**: Relying on system prompts ("*never delete tables*") fails against prompt injection. Security decisions must be **external, deterministic, and non-bypassable**.
-- **The Tri-State Decision Model**: Autonomous operations require more than binary `ALLOW` and `DENY`. Sensitive operations require **`APPROVAL_REQUIRED`** to pause autonomous execution and request human sign-off.
-- **Delegation Invariants**: When an agent delegates tasks to a sub-agent, permissions must be strictly bounded:
-  $$\text{Permissions}_{\text{delegate}} \subseteq \text{Permissions}_{\text{delegator}}$$
-
----
-
-## Core Principles
-
-- **Agent Identity as a First-Class Principal**: An agent is an autonomous entity with roles, temporal validity, and delegation lineage.
-- **Deny by Default**: Any unmapped action or role fails closed.
-- **Explicit Deny Precedence**: A matching `DENY` rule overrides all `ALLOW` grants.
-- **Language-Neutral Policies**: Policies are declarative YAML/JSON files governed by JSON Schema.
-- **Zero-Dependency Core**: `agentguard-core` is written in pure Java 21 without framework dependencies.
-
----
-
-## Quick Start (Spring Boot & MCP)
-
-For a runnable SQL-backed app with a browser dashboard, seeded H2 database,
-authenticated demo accounts, refund approvals, and sanitized audit history, see
-[the H2 orders app](agentguard-examples/h2-orders-app/README.md).
-
-For a complete project that consumes the **published Maven Central release**, see
-[the standalone published dependency example](agentguard-examples/published-dependency-example/README.md).
-It demonstrates allowed, denied, and approval-required calls, audit redaction, and
-MCP error mapping without building or installing AgentGuard locally.
-
-### Run the H2 Orders App
-
-With Java 21+ and Maven installed:
-
-```bash
+```shell
 cd agentguard-examples/h2-orders-app
 mvn verify
 java -jar target/h2-orders-app-1.0.0-SNAPSHOT.jar --debug=false
 ```
 
-Open **http://localhost:8080**. Sign in as `developer`, `operator`, `approver`, or
-`auditor`, using password `demo-pass`. The app includes a seeded H2 database,
-real SQL operations, production refund approvals, and audit records with nested
-secret redaction. Data resets when the app restarts.
+Open **http://localhost:8080**. Users `developer`, `operator`, `approver`, and
+`auditor` all use password `demo-pass`. The app has seeded H2 orders, real SQL,
+production refund approvals, and nested secret redaction. Data resets on restart.
+On Windows, `./run.ps1` builds and starts it; `./demo.ps1` runs the API walkthrough.
 
-On Windows, you can use `./run.ps1` from the app directory to build and start it.
-Run `./demo.ps1` in another PowerShell terminal for an automated API walkthrough.
-See the [app README](agentguard-examples/h2-orders-app/README.md) for role permissions,
-API usage, and the distinction between library features and application code.
+This app remains pinned to the published release. Its approval workflow is
+application code. [Full instructions](agentguard-examples/h2-orders-app/README.md).
+For a smaller console demo, see the
+[published dependency example](agentguard-examples/published-dependency-example/README.md).
 
-### 1. Add Maven Dependency
+### Development version: Spring AI + real MCP + reusable approvals
+
+From the repository root:
+
+```shell
+mvn clean install
+mvn -f agentguard-examples/spring-ai-mcp-server/pom.xml verify
+java -jar agentguard-examples/spring-ai-mcp-server/target/spring-ai-mcp-server-1.0.0-SNAPSHOT.jar --debug=false
+```
+
+The MCP server listens at **http://localhost:8082/mcp**. In another terminal:
+
+```shell
+mvn -f agentguard-examples/spring-ai-mcp-server/pom.xml org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=io.agentguard.mcpdemo.DemoClient"
+```
+
+The client demonstrates an allowed read, a denied production read, an approval
+requirement, a separate approver, and single-use approved execution. No model
+API key or external database is required. This example consumes the new library
+modules and propagates authenticated identity over real Streamable HTTP MCP.
+[Full instructions](agentguard-examples/spring-ai-mcp-server/README.md).
+
+## Integrate the development starter
+
+After installing the snapshot locally, add this dependency to a Spring Boot app:
 
 ```xml
 <dependency>
     <groupId>io.github.amaljeevs</groupId>
     <artifactId>agentguard-spring-boot-starter</artifactId>
-    <version>0.1.0</version>
+    <version>0.2.0-SNAPSHOT</version>
 </dependency>
 ```
 
-### 2. Define `agentguard-policy.yaml`
+Use `0.1.0` to consume the published release, with the limitations listed in the
+changelog. Configure authentication through Spring Security or supply a trusted
+`AgentIdentityResolver`. Never accept identity/roles directly from model arguments.
 
-Place this in `src/main/resources/agentguard-policy.yaml`:
+Create `src/main/resources/agentguard-policy.yaml`:
 
 ```yaml
 version: "1.0"
 metadata:
-  name: "enterprise-mcp-governance"
-
+  name: order-governance
 roles:
-  developer:
-    permissions:
-      - "git.read"
-      - "git.write"
-      - "logs.read"
-      - "database.query"
-
-  devops:
-    permissions:
-      - "logs.read"
-      - "kubernetes.*"
-      - "database.*"
-
+  operator:
+    permissions: [orders.read, orders.refund]
 rules:
-  # Deny developers from querying production databases
-  - id: "deny-dev-prod-db"
-    effect: DENY
-    target:
-      roles: ["developer"]
-      actions: ["database.query"]
-      conditions:
-        environment:
-          equals: "production"
-
-  # Production deployments require human approval
-  - id: "prod-deploy-approval"
+  - id: production-refund-review
     effect: APPROVAL_REQUIRED
     target:
-      actions: ["kubernetes.deploy"]
+      actions: [orders.refund]
       conditions:
         environment:
-          equals: "production"
+          equals: production
 ```
 
-### 3. Protect Tools with `@AgentAuthorize`
+Protect Spring-managed service methods:
 
 ```java
-@Service
-public class DatabaseTools {
-
-    @McpTool(name = "queryDatabase")
-    @AgentAuthorize("database.query")
-    public QueryResult queryDatabase(String query) {
-        return dbClient.execute(query);
-    }
-
-    @McpTool(name = "deployCluster")
-    @AgentAuthorize(action = "kubernetes.deploy", environment = "production")
-    public Deployment deploy(String serviceName) {
-        return k8sClient.deploy(serviceName);
-    }
+@AgentAuthorize(action = "orders.refund", resourceType = "order",
+    resourceId = "#p0", environment = "production")
+public void refund(long orderId) {
+    // Application SQL/client operation, executed only after authorization allows it.
 }
 ```
 
----
+A matching production approval rule blocks the method with
+`AgentApprovalRequiredException`. Use the optional `agentguard-approval` module
+for approval issuance, separate approver checks, and bound execution. The
+annotation does not automatically implement a review UI or approval storage.
+Calls must go through the Spring proxy; self-invocation is not intercepted.
+Use `GuardedToolCallback` for the Spring AI execution boundary.
 
-## Maven Module Architecture
-
-| Module | Description |
-| :--- | :--- |
-| `agentguard-core` | Pure Java 21 domain models, records, and deterministic Policy Decision Point (PDP). Zero external dependencies. |
-| `agentguard-policy` | YAML policy loading, validation, and compilation for `agentguard-policy.yaml`. |
-| `agentguard-audit` | Structured audit events, recursive parameter sanitization, and SLF4J, in-memory, and composite publishers. |
-| `agentguard-spring` | `@AgentAuthorize` AOP interceptor and Spring Security context adapter. |
-| `agentguard-spring-boot-starter`| Spring Boot 3 auto-configuration and configuration properties. |
-| `agentguard-mcp` | Authorization exception mapping to MCP/JSON-RPC error objects (`-32001`, `-32003`, `-32004`). |
-| `agentguard-examples` | Spring integration sample, standalone published-dependency demo, and runnable H2 orders app. |
-| `specification` | Language-neutral JSON Schema and architectural documentation. |
-
----
-
-## Author & Maintainer
-
-- **Author**: **Amal jeev s** ([@Amaljeevs](https://github.com/Amaljeevs))
-- **Email**: [amaljeevs3739@gmail.com](mailto:amaljeevs3739@gmail.com)
-- **Repository**: [https://github.com/Amaljeevs/agentguard](https://github.com/Amaljeevs/agentguard)
-
----
-
-## Security Reports
-
-Report vulnerabilities privately to [amaljeevs3739@gmail.com](mailto:amaljeevs3739@gmail.com).
-See [SECURITY.md](SECURITY.md) for the reporting process.
-
----
-
-## Maven Central Publishing
-
-Artifacts are published to Maven Central under group ID `io.github.amaljeevs`:
-
-```xml
-<dependency>
-    <groupId>io.github.amaljeevs</groupId>
-    <artifactId>agentguard-spring-boot-starter</artifactId>
-    <version>0.1.0</version>
-</dependency>
+```yaml
+agentguard:
+  policy-location: classpath:agentguard-policy.yaml
+  audit:
+    enabled: true
+    mask-token: "[HIDDEN]"
+    sensitive-keys: [customerEmail, internalNote]
+    failure-mode: FAIL_CLOSED
 ```
 
-To release and publish to Maven Central via Sonatype Central Portal:
+The default JSON audit logger is `io.agentguard.audit.json`. It records sanitized
+parameters and metadata. Authorization and execution outcomes are separate,
+correlated events. `BEST_EFFORT` is available when continuing after an audit sink
+failure is an explicit application decision. Post-execution logging failure may
+occur after side effects; applications still need idempotency.
 
-```bash
-mvn clean deploy -P release
+## Modules
+
+| Module | Responsibility |
+| --- | --- |
+| `agentguard-core` | Dependency-free Java policy engine, identity/request models, permission matching, content revisions, trusted delegation lookup |
+| `agentguard-policy` | YAML loading/validation and declarative policy test CLI |
+| `agentguard-audit` | Structured sanitization, `@Sensitive`, JSON/SLF4J/composite/bounded-memory publishers, execution lifecycle |
+| `agentguard-spring` | `@AgentAuthorize`, fail-closed expression resolution, Spring Security identity bridge |
+| `agentguard-spring-boot-starter` | Default beans, configuration properties, required AOP/security-core dependencies |
+| `agentguard-mcp` | Authorization-exception to error-object mapping; no implicit transport registration |
+| `agentguard-approval` | Optional exact-request approvals, expiration, rejection, atomic store SPI and reference in-memory implementation |
+| `agentguard-spring-ai` | Optional ToolCallback and ToolCallbackProvider enforcement wrappers |
+
+`agentguard-approval` and `agentguard-spring-ai` are new in the development version.
+The starter does not pull in an MCP server or an LLM provider.
+
+## Policy semantics
+
+Identity validity and explicit DENY rules are checked first. An explicit ALLOW or
+role/direct permission must grant the action before a matching approval rule can
+return APPROVAL_REQUIRED. Otherwise the result is DENY. For delegation, the
+request must be eligible for both child and every trusted ancestor; unknown
+parents, cycles, excessive depth and invalid temporal bounds deny.
+
+A configured expression that cannot resolve is denied; it does not silently
+change the environment. Use trusted resource metadata for environments. The
+core evaluator accepts an explicit evaluation timestamp for deterministic tests;
+production callers must supply a trusted current clock.
+
+See the [policy specification](specification/docs/POLICY_SPECIFICATION.md) and
+[security boundaries](SECURITY.md).
+
+## Tests, policy checks, and benchmarks
+
+```shell
+mvn clean verify
+mvn -f agentguard-policy/pom.xml org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=io.agentguard.policy.testing.PolicyTestCli" "-Dexec.args=agentguard-examples/spring-ai-mcp-server/src/main/resources/agentguard-policy.yaml specification/examples/policy-scenarios.json"
 ```
 
----
+Run the CLI from the repository root after `mvn install`. It prints decisions,
+matched rules, and policy revision; mismatched expectations return a failing
+process status. CI also builds both independent published-release examples and
+runs the development MCP network tests.
+
+[The JMH harness](benchmarks/README.md) measures evaluation and sanitization for
+specified workloads. Report hardware, JDK and workload with results; microbenchmarks
+are not end-to-end latency guarantees.
+
+| Integration | Tested baseline |
+| --- | --- |
+| Core, audit, policy, approvals | Java 21 |
+| Spring starter and published consumer examples | Spring Boot 3.3.4 |
+| New Spring AI/MCP example | Spring Boot 3.5.7, Spring AI 1.1.0, MCP Java SDK 0.16.0 |
+
+Other versions are not claimed compatible until tested. Current audit/approval
+changes are documented breaking behavior changes for consumers of 0.1.0.
+
+## Boundaries and future work
+
+Structured redaction does not detect every secret in arbitrary text or sanitize
+all third-party logs. The reference approval store is not shared/durable. There
+is no built-in risk scoring, universal prompt-injection protection, agent sandbox,
+or Python/TypeScript/Go runtime. See [why-agentguard.md](why-agentguard.md) for
+implemented capabilities and explicitly future work.
+
+## Maintainer and security reports
+
+Maintained by **Amal jeev s** ([@Amaljeevs](https://github.com/Amaljeevs)).
+Contact [amaljeevs3739@gmail.com](mailto:amaljeevs3739@gmail.com).
+Report vulnerabilities privately using [SECURITY.md](SECURITY.md).
+
+## Publishing
+
+The group ID is `io.github.amaljeevs`. Publishing is a maintainer release action:
+select an unused non-SNAPSHOT release version, run all checks, configure Central
+credentials/signing, then use `mvn clean deploy -P release`. The current snapshot
+has not been deployed, and the existing 0.1.0 artifacts are not overwritten.
 
 ## License
 
-AgentGuard is open source software licensed under the [Apache License, Version 2.0](LICENSE).
-Copyright (c) 2026 Amal Jeev S.
+[Apache License 2.0](LICENSE). Copyright (c) 2026 Amal Jeev S.

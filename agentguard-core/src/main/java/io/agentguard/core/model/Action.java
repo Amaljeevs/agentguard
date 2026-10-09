@@ -2,6 +2,8 @@ package io.agentguard.core.model;
 
 import java.util.Map;
 import java.util.Objects;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 
 /**
  * Represents the target operation or tool call requested by an agent.
@@ -16,7 +18,7 @@ public record Action(
         if (name.isBlank()) {
             throw new IllegalArgumentException("Action name cannot be blank");
         }
-        parameters = parameters == null ? Map.of() : Map.copyOf(parameters);
+        parameters = parameters == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(parameters));
     }
 
     public static Action of(String name) {
