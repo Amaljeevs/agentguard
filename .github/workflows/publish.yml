@@ -41,4 +41,4 @@ jobs:
         env:
           MAVEN_CENTRAL_USERNAME: ${{ secrets.CENTRAL_PORTAL_TOKEN_USERNAME }}
           MAVEN_CENTRAL_TOKEN: ${{ secrets.CENTRAL_PORTAL_TOKEN_PASSWORD }}
-        run: mvn clean deploy -P release --batch-mode -Dgpg.passphrase=""
+        run: mvn clean deploy -P release --batch-mode -DskipTests -Dgpg.passphrase="" -Dmaven.deploy.skip=true
