@@ -37,14 +37,10 @@ jobs:
           GPG_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
         run: python3 .github/scripts/import_gpg_key.py
 
-      - name: Publish with Maven Central Plugin
+      - name: Publish to Maven Central
         env:
           MAVEN_CENTRAL_USERNAME: ${{ secrets.CENTRAL_PORTAL_TOKEN_USERNAME }}
           MAVEN_CENTRAL_TOKEN: ${{ secrets.CENTRAL_PORTAL_TOKEN_PASSWORD }}
         run: |
-          mvn clean deploy -P release --batch-mode -DskipTests -Dgpg.passphrase="" -Dmaven.deploy.skip=true || true
-          echo "=== CENTRAL STAGING TREE ==="
-          find target/central-staging -type f || true
-          echo "=== ZIP CONTENTS ==="
-          find target -name "*.zip" -exec unzip -l {} + || true
-          exit 1
+          mvn clean deploy -P release --batch-mode -DskipTests -Dgpg.passphrase="" -Dmaven.deploy.skip=true -Dcentral-publishing-maven-plugin.skipPublishing=true
+          python3 .github/scripts/package_and_publish.py
