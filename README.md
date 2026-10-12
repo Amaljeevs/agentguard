@@ -2,9 +2,13 @@
 
 **Tool-level authorization, request-bound approvals, and sanitized audit trails for Java agents.**
 
-[![CI](https://github.com/Amaljeevs/agentguard/actions/workflows/ci.yml/badge.svg)](https://github.com/Amaljeevs/agentguard/actions/workflows/ci.yml)
-[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.amaljeevs/agentguard-parent.svg?color=007ec6&label=Maven%20Central)](https://central.sonatype.com/artifact/io.github.amaljeevs/agentguard-parent)
+[![GitHub Release](https://img.shields.io/github/v/release/Amaljeevs/agentguard?color=10b981&label=Release)](https://github.com/Amaljeevs/agentguard/releases)
+[![CI Build](https://github.com/Amaljeevs/agentguard/actions/workflows/ci.yml/badge.svg)](https://github.com/Amaljeevs/agentguard/actions/workflows/ci.yml)
+[![CodeQL Analysis](https://github.com/Amaljeevs/agentguard/actions/workflows/codeql.yml/badge.svg)](https://github.com/Amaljeevs/agentguard/actions/workflows/codeql.yml)
+[![Javadoc](https://javadoc.io/badge2/io.github.amaljeevs/agentguard-parent/javadoc.svg)](https://javadoc.io/doc/io.github.amaljeevs/agentguard-parent)
 [![Java](https://img.shields.io/badge/Java-21%2B-orange.svg)](https://openjdk.org/projects/jdk/21/)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 AgentGuard evaluates who may perform an action on a resource in a particular
 environment, stops denied or unapproved calls, and records structured evidence.
