@@ -77,9 +77,16 @@ public class AgentGuardAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
+    public io.agentguard.core.tracing.AgentGuardTracingHook agentGuardTracingHook() {
+        return io.agentguard.core.tracing.AgentGuardTracingHook.NOOP;
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
     public PolicyEngine agentGuardPolicyEngine(PolicySet policySet, PermissionMatcher permissionMatcher,
-                                                AgentIdentityLookup identities, AgentGuardProperties properties) {
-        return new DefaultPolicyEngine(policySet, permissionMatcher, identities, properties.getMaxDelegationDepth());
+                                                AgentIdentityLookup identities, AgentGuardProperties properties,
+                                                io.agentguard.core.tracing.AgentGuardTracingHook tracingHook) {
+        return new DefaultPolicyEngine(policySet, permissionMatcher, identities, properties.getMaxDelegationDepth(), tracingHook);
     }
 
     @Bean @ConditionalOnMissingBean
@@ -118,7 +125,8 @@ public class AgentGuardAutoConfiguration {
         AgentIdentityResolver identityResolver,
         AuditEventPublisher auditPublisher,
         ParameterSanitizer parameterSanitizer,
-        AgentGuardProperties properties
+        AgentGuardProperties properties,
+        io.agentguard.core.metrics.AgentGuardMetrics metrics
     ) {
         return new AgentAuthorizationAspect(
             policyEngine,
@@ -126,7 +134,23 @@ public class AgentGuardAutoConfiguration {
             properties.getAudit().isEnabled()
                 ? new ReliableAuditEventPublisher(auditPublisher, properties.getAudit().getFailureMode()) : event -> {},
             parameterSanitizer,
-            properties.getEnvironment()
+            properties.getEnvironment(),
+            metrics
         );
+    }
+
+    @Bean
+    @org.springframework.boot.autoconfigure.condition.ConditionalOnClass(name = "io.micrometer.core.instrument.MeterRegistry")
+    @org.springframework.boot.autoconfigure.condition.ConditionalOnBean(type = "io.micrometer.core.instrument.MeterRegistry")
+    @ConditionalOnMissingBean(io.agentguard.core.metrics.AgentGuardMetrics.class)
+    public io.agentguard.core.metrics.AgentGuardMetrics agentGuardMicrometerMetrics(org.springframework.beans.factory.ObjectProvider<io.micrometer.core.instrument.MeterRegistry> meterRegistryProvider) {
+        io.micrometer.core.instrument.MeterRegistry registry = meterRegistryProvider.getIfAvailable();
+        return registry != null ? new io.agentguard.spring.metrics.MicrometerAgentGuardMetrics(registry) : io.agentguard.core.metrics.AgentGuardMetrics.NOOP;
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(io.agentguard.core.metrics.AgentGuardMetrics.class)
+    public io.agentguard.core.metrics.AgentGuardMetrics agentGuardNoopMetrics() {
+        return io.agentguard.core.metrics.AgentGuardMetrics.NOOP;
     }
 }

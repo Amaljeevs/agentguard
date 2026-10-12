@@ -35,14 +35,16 @@ public class AgentGuardWebAutoConfiguration {
             AgentIdentityResolver identityResolver,
             AuditEventPublisher auditPublisher,
             ParameterSanitizer parameterSanitizer,
-            Optional<ApprovalService> approvalService) {
+            Optional<ApprovalService> approvalService,
+            org.springframework.beans.factory.ObjectProvider<io.agentguard.core.metrics.AgentGuardMetrics> metricsProvider) {
         return new AgentGuardAuthorizationApi(
                 policyEngine,
                 identityResolver,
                 auditPublisher,
                 parameterSanitizer,
                 approvalService,
-                Duration.ofMinutes(5)
+                Duration.ofMinutes(5),
+                metricsProvider.getIfAvailable(() -> io.agentguard.core.metrics.AgentGuardMetrics.NOOP)
         );
     }
 

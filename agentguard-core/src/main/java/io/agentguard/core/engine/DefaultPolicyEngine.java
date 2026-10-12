@@ -41,6 +41,7 @@ public class DefaultPolicyEngine implements PolicyEngine {
     private final AgentIdentityLookup identities;
     private final String revision;
     private final int maxDelegationDepth;
+    private final io.agentguard.core.tracing.AgentGuardTracingHook tracingHook;
 
     public DefaultPolicyEngine(PolicySet policySet) {
         this(policySet, new DefaultPermissionMatcher());
@@ -56,6 +57,12 @@ public class DefaultPolicyEngine implements PolicyEngine {
 
     public DefaultPolicyEngine(PolicySet policySet, PermissionMatcher permissionMatcher,
                                AgentIdentityLookup identities, int maxDelegationDepth) {
+        this(policySet, permissionMatcher, identities, maxDelegationDepth, io.agentguard.core.tracing.AgentGuardTracingHook.NOOP);
+    }
+
+    public DefaultPolicyEngine(PolicySet policySet, PermissionMatcher permissionMatcher,
+                               AgentIdentityLookup identities, int maxDelegationDepth,
+                               io.agentguard.core.tracing.AgentGuardTracingHook tracingHook) {
         this.policySet = Objects.requireNonNull(policySet, "policySet must not be null");
         this.permissionMatcher = Objects.requireNonNull(permissionMatcher, "permissionMatcher must not be null");
         this.identities = Objects.requireNonNull(identities, "identities must not be null");
@@ -63,6 +70,7 @@ public class DefaultPolicyEngine implements PolicyEngine {
             throw new IllegalArgumentException("maxDelegationDepth must be between 0 and 64");
         }
         this.maxDelegationDepth = maxDelegationDepth;
+        this.tracingHook = tracingHook != null ? tracingHook : io.agentguard.core.tracing.AgentGuardTracingHook.NOOP;
         this.revision = PolicyRevision.of(policySet);
     }
 
@@ -72,7 +80,7 @@ public class DefaultPolicyEngine implements PolicyEngine {
     @Override
     public AuthorizationDecision evaluate(AuthorizationRequest request) {
         Objects.requireNonNull(request, "AuthorizationRequest must not be null");
-        String traceId = traceId(request.context());
+        String traceId = resolveTraceId(request.context());
         List<String> claimedChain = request.subject().delegationChain();
         if (claimedChain.size() > maxDelegationDepth) {
             return decision(Decision.DENY, "Invalid delegation: maximum depth exceeded", null,
@@ -279,9 +287,15 @@ public class DefaultPolicyEngine implements PolicyEngine {
             policySet.version(), revision, risk, traceId, evaluatedAt);
     }
 
-    private static String traceId(AuthorizationContext context) {
+    private String resolveTraceId(AuthorizationContext context) {
         Object supplied = context.metadata().get("traceId");
         if (supplied instanceof String trace && !trace.isBlank() && trace.length() <= 128) return trace;
+        if (tracingHook != null) {
+            java.util.Optional<String> hookTrace = tracingHook.resolveCurrentTraceId();
+            if (hookTrace != null && hookTrace.isPresent() && !hookTrace.get().isBlank()) {
+                return hookTrace.get();
+            }
+        }
         return UUID.randomUUID().toString();
     }
 

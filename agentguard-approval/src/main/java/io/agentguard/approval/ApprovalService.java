@@ -20,12 +20,20 @@ public final class ApprovalService {
     private final Clock clock;
     private final AuditEventPublisher audit;
     private final ParameterSanitizer sanitizer;
+    private final io.agentguard.core.metrics.AgentGuardMetrics metrics;
 
     public ApprovalService(PolicyEngine engine, ApprovalStore store, Clock clock,
                            AuditEventPublisher audit, ParameterSanitizer sanitizer) {
+        this(engine, store, clock, audit, sanitizer, io.agentguard.core.metrics.AgentGuardMetrics.NOOP);
+    }
+
+    public ApprovalService(PolicyEngine engine, ApprovalStore store, Clock clock,
+                           AuditEventPublisher audit, ParameterSanitizer sanitizer,
+                           io.agentguard.core.metrics.AgentGuardMetrics metrics) {
         this.engine = Objects.requireNonNull(engine); this.store = Objects.requireNonNull(store);
         this.clock = Objects.requireNonNull(clock); this.audit = Objects.requireNonNull(audit);
         this.sanitizer = Objects.requireNonNull(sanitizer);
+        this.metrics = metrics != null ? metrics : io.agentguard.core.metrics.AgentGuardMetrics.NOOP;
     }
 
     public ApprovalTicket request(AuthorizationRequest request, Duration ttl) {
@@ -43,6 +51,7 @@ public final class ApprovalService {
         audit.publish(AuditEvent.from(snapshot, decision, sanitizer).lifecycle("APPROVAL_REQUIRED", ticket.id(), revision,
             Map.of("approvalState", ticket.state().name())));
         store.create(ticket);
+        metrics.recordApprovalEvent("created");
         return ticket;
     }
 
@@ -72,9 +81,11 @@ public final class ApprovalService {
             return next;
         });
         if (expired.get()) {
+            metrics.recordApprovalEvent("expired");
             auditExpiry(approver, result);
             throw denied("Approval expired");
         }
+        metrics.recordApprovalEvent(approve ? "approved" : "denied");
         return result;
     }
 
@@ -98,13 +109,16 @@ public final class ApprovalService {
             return current.withState(ApprovalTicket.State.CONSUMED, current.decidedBy());
         });
         if (expired.get()) {
+            metrics.recordApprovalEvent("expired");
             audit.publish(event.lifecycle("APPROVAL_EXPIRED", id, ticket.policyRevision(),
                 Map.of("approvalState", ApprovalTicket.State.EXPIRED.name())));
             throw denied("Approval expired");
         }
+        metrics.recordApprovalEvent("consumed");
         T result;
         try { result = operation.apply(snapshot); }
         catch (RuntimeException | Error failure) {
+            metrics.recordError("execution_failure");
             try { audit.publish(event.lifecycle("EXECUTION_FAILED", id, ticket.policyRevision(),
                 Map.of("exceptionType", failure.getClass().getName(), "approvalRequestId", id))); }
             catch (RuntimeException auditFailure) { failure.addSuppressed(auditFailure); }

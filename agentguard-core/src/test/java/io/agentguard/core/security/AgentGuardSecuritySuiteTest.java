@@ -246,4 +246,108 @@ class AgentGuardSecuritySuiteTest {
         assertThatThrownBy(() -> SpiffeSvid.of("spiffe:///missing-trust-domain", now, now.plusSeconds(60)))
             .isInstanceOf(IllegalArgumentException.class);
     }
+
+    // 12. Delegation Cycles
+    @Test
+    void testDelegationCycles_cyclesAreDetectedAndDenied() {
+        var agentA = AgentIdentity.builder().agentId("agent-a").delegatedBy("agent-b")
+            .permission("database.read").delegationChain(List.of("agent-b"))
+            .issuedAt(now.minusSeconds(60)).expiresAt(now.plusSeconds(600)).build();
+        var agentB = AgentIdentity.builder().agentId("agent-b").delegatedBy("agent-a")
+            .permission("database.read").delegationChain(List.of("agent-a"))
+            .issuedAt(now.minusSeconds(60)).expiresAt(now.plusSeconds(600)).build();
+
+        Map<String, AgentIdentity> pool = Map.of("agent-a", agentA, "agent-b", agentB);
+        var policy = PolicySet.builder("cycle-policy", "1.0").build();
+        var engine = new DefaultPolicyEngine(policy, new DefaultPermissionMatcher(), id -> Optional.ofNullable(pool.get(id)));
+
+        var decision = engine.evaluate(request(agentA, "database.read", Map.of()));
+        assertThat(decision.isDenied()).isTrue();
+        assertThat(decision.reason()).contains("Invalid delegation");
+    }
+
+    // 13. Expired Delegation & Validity Invariants
+    @Test
+    void testExpiredDelegation_parentValidityViolationFailsClosed() {
+        // Parent expired 1 second ago
+        var expiredParent = AgentIdentity.builder().agentId("parent-agent")
+            .permission("database.read")
+            .issuedAt(now.minusSeconds(600))
+            .expiresAt(now.minusSeconds(1))
+            .build();
+
+        var child = AgentIdentity.builder().agentId("child-agent")
+            .delegatedBy("parent-agent")
+            .delegationChain(List.of("parent-agent"))
+            .permission("database.read")
+            .issuedAt(now.minusSeconds(30))
+            .expiresAt(now.plusSeconds(300))
+            .build();
+
+        var policy = PolicySet.builder("validity-policy", "1.0").build();
+        var engine = new DefaultPolicyEngine(policy, new DefaultPermissionMatcher(), id -> Optional.of(expiredParent));
+
+        var decision = engine.evaluate(request(child, "database.read", Map.of()));
+        assertThat(decision.isDenied()).isTrue();
+        assertThat(decision.reason()).contains("validity");
+    }
+
+    // 14. Wildcard Permission Matching (Parameterized)
+    @org.junit.jupiter.params.ParameterizedTest(name = "Pattern ''{0}'' on ''{1}'' should be permitted={2}")
+    @org.junit.jupiter.params.provider.CsvSource({
+        "database.*, database.query, true",
+        "database.*, database.table.drop, true",
+        "database.*, cache.clear, false",
+        "kubernetes.*.deploy, kubernetes.us-east.deploy, true",
+        "kubernetes.*.deploy, kubernetes.us-east.restart, false",
+        "*, any.action.whatsoever, true"
+    })
+    void testWildcardPermissionMatching_parameterized(String pattern, String actionName, boolean shouldAllow) {
+        var subject = identity("wildcard-agent", null, pattern);
+        var policy = PolicySet.builder("wildcard-policy", "1.0").build();
+        var engine = new DefaultPolicyEngine(policy);
+
+        var decision = engine.evaluate(request(subject, actionName, Map.of()));
+        if (shouldAllow) {
+            assertThat(decision.isAllowed()).isTrue();
+        } else {
+            assertThat(decision.isDenied()).isTrue();
+        }
+    }
+
+    // 15. Deny-By-Default Across Unconfigured Actions (Parameterized)
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {
+        "cluster.delete", "user.impersonate", "secret.export", "billing.charge"
+    })
+    void testDenyByDefault_parameterized(String unauthorizedAction) {
+        var subject = identity("guest-agent", null, "audit.read");
+        var policy = PolicySet.builder("strict-policy", "1.0").build();
+        var engine = new DefaultPolicyEngine(policy);
+
+        var decision = engine.evaluate(request(subject, unauthorizedAction, Map.of()));
+        assertThat(decision.isDenied()).isTrue();
+        assertThat(decision.reason()).contains("Access denied");
+    }
+
+    // 16. Canonical Argument Hashing Edge Cases
+    @Test
+    void testCanonicalArgumentHashing_nestedMapsAndOrderingNormalized() {
+        Map<String, Object> map1 = new LinkedHashMap<>();
+        map1.put("z", 100);
+        map1.put("a", Map.of("innerB", 2, "innerA", 1));
+
+        Map<String, Object> map2 = new LinkedHashMap<>();
+        map2.put("a", Map.of("innerA", 1, "innerB", 2));
+        map2.put("z", 100);
+
+        String hash1 = RequestFingerprint.argumentsHash(map1);
+        String hash2 = RequestFingerprint.argumentsHash(map2);
+        assertThat(hash1).isEqualTo(hash2);
+
+        // Tampering with nested value changes hash
+        Map<String, Object> tampered = new LinkedHashMap<>(map1);
+        tampered.put("z", 101);
+        assertThat(RequestFingerprint.argumentsHash(tampered)).isNotEqualTo(hash1);
+    }
 }

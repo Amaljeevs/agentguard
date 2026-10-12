@@ -38,7 +38,7 @@ jobs:
           '-Dexec.args=agentguard-examples/spring-ai-mcp-server/src/main/resources/agentguard-policy.yaml specification/examples/policy-scenarios.json'
 
   published-consumers:
-    name: Published 0.1.0 / ${{ matrix.example }}
+    name: Published 0.2.1 / ${{ matrix.example }}
     runs-on: ubuntu-latest
     strategy:
       matrix:

@@ -10,63 +10,48 @@
 [![Java](https://img.shields.io/badge/Java-21%2B-orange.svg)](https://openjdk.org/projects/jdk/21/)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
-AgentGuard evaluates who may perform an action on a resource in a particular
-environment, stops denied or unapproved calls, and records structured evidence.
-OAuth/OIDC and Spring Security authenticate the caller and validate JWTs;
-AgentGuard governs the business action that an authenticated agent proposes.
-Read [why-agentguard.md](why-agentguard.md) for the comparison, supported use cases,
-and future directions.
+> **AgentGuard provides deterministic authorization and governance for AI agent actions and complements OAuth/JWT/Spring Security rather than replacing authentication.**
 
-**Release status:** `0.1.0` and `0.2.0` are published on Maven Central. The latest code
-is **`0.2.1`**. See [CHANGELOG.md](CHANGELOG.md) for behavior changes and migration.
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.amaljeevs/agentguard-parent.svg?color=007ec6&label=Maven%20Central)](https://central.sonatype.com/artifact/io.github.amaljeevs/agentguard-parent)
+[![GitHub Release](https://img.shields.io/github/v/release/Amaljeevs/agentguard?color=10b981&label=Release)](https://github.com/Amaljeevs/agentguard/releases)
+[![CI Build](https://github.com/Amaljeevs/agentguard/actions/workflows/ci.yml/badge.svg)](https://github.com/Amaljeevs/agentguard/actions/workflows/ci.yml)
+[![CodeQL Analysis](https://github.com/Amaljeevs/agentguard/actions/workflows/codeql.yml/badge.svg)](https://github.com/Amaljeevs/agentguard/actions/workflows/codeql.yml)
+[![Javadoc](https://javadoc.io/badge2/io.github.amaljeevs/agentguard-parent/javadoc.svg)](https://javadoc.io/doc/io.github.amaljeevs/agentguard-parent)
+[![Java](https://img.shields.io/badge/Java-21%2B-orange.svg)](https://openjdk.org/projects/jdk/21/)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
-## Try a runnable app
+**Current Release:** `0.2.1` is published on Maven Central. See [CHANGELOG.md](CHANGELOG.md) for detailed release notes.
 
-### Published release: H2 browser dashboard
+---
 
-With Java 21+ and Maven 3.6.3+:
+### Understand AgentGuard in 30 Seconds
 
-```shell
-cd agentguard-examples/h2-orders-app
-mvn verify
-java -jar target/h2-orders-app-1.0.0-SNAPSHOT.jar --debug=false
-```
+1. **Who calls?** Upstream authentication (OAuth2 / OIDC / mTLS / SPIFFE / Spring Security) validates credentials and supplies trusted claims.
+2. **What is proposed?** An AI agent, LLM tool, or MCP client requests an action (e.g., `kubernetes.deploy` or `database.query`) with specific arguments.
+3. **Who decides?** AgentGuard evaluates the request against deterministic, declarative policies without letting the LLM decide its own safety.
+4. **What happens?**
+   - **`ALLOW`**: The tool executes immediately.
+   - **`DENY`**: Execution halts fail-closed with clear decision reason, matched policy, and risk metadata.
+   - **`APPROVAL_REQUIRED`**: Generates a cryptographic SHA-256 request binding (`ApprovalTicket`) requiring human sign-off before single-use execution.
+5. **What is recorded?** Parameter-sanitized audit trails record argument hashes, delegation chains, policy revisions, and trace IDs without leaking secrets.
 
-Open **http://localhost:8080**. Users `developer`, `operator`, `approver`, and
-`auditor` all use password `demo-pass`. The app has seeded H2 orders, real SQL,
-production refund approvals, and nested secret redaction. Data resets on restart.
-On Windows, `./run.ps1` builds and starts it; `./demo.ps1` runs the API walkthrough.
+---
 
-This app remains pinned to the published release. Its approval workflow is
-application code. [Full instructions](agentguard-examples/h2-orders-app/README.md).
-For a smaller console demo, see the
-[published dependency example](agentguard-examples/published-dependency-example/README.md).
+### When should I use AgentGuard?
 
-### Development version: Spring AI + real MCP + reusable approvals
+Use AgentGuard when:
+- **You build autonomous AI agents or tool-calling systems** that interact with production APIs, databases, cloud infrastructure, or financial transactions.
+- **You need deterministic security invariants**: RBAC permissions and safety rules must be enforced by application code, never by prompt engineering or LLM self-policing.
+- **You need action-bound human approvals**: Critical actions must be cryptographically bound to exact canonical arguments, policy versions, and expiration timestamps, preventing argument tampering or replay attacks.
+- **You have agent delegation hierarchies**: Child agents execute tasks on behalf of parent agents, requiring strict containment (`child permissions ⊆ parent permissions`), cycle detection, and max depth limits.
+- **You need compliance & forensic audit trails**: Every decision must be traceable with policy versions and correlation IDs, while sensitive data (tokens, passwords, PII) is automatically redacted.
+- **You need polyglot or MCP support**: Intercept Spring AI tools, MCP protocol servers, Spring AOP services, or non-Java agents via `POST /v1/authorize`.
 
-From the repository root:
+---
 
-```shell
-mvn clean install
-mvn -f agentguard-examples/spring-ai-mcp-server/pom.xml verify
-java -jar agentguard-examples/spring-ai-mcp-server/target/spring-ai-mcp-server-1.0.0-SNAPSHOT.jar --debug=false
-```
+## Quickstart: Integrate AgentGuard
 
-The MCP server listens at **http://localhost:8082/mcp**. In another terminal:
-
-```shell
-mvn -f agentguard-examples/spring-ai-mcp-server/pom.xml org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=io.agentguard.mcpdemo.DemoClient"
-```
-
-The client demonstrates an allowed read, a denied production read, an approval
-requirement, a separate approver, and single-use approved execution. No model
-API key or external database is required. This example consumes the new library
-modules and propagates authenticated identity over real Streamable HTTP MCP.
-[Full instructions](agentguard-examples/spring-ai-mcp-server/README.md).
-
-## Integrate the development starter
-
-Add this dependency to a Spring Boot app:
+Add the starter dependency to your Spring Boot 3 application:
 
 ```xml
 <dependency>
@@ -76,9 +61,7 @@ Add this dependency to a Spring Boot app:
 </dependency>
 ```
 
-Use `0.1.0` to consume the published release, with the limitations listed in the
-changelog. Configure authentication through Spring Security or supply a trusted
-`AgentIdentityResolver`. Never accept identity/roles directly from model arguments.
+Configure authentication through Spring Security or supply a trusted `AgentIdentityResolver`. Never accept identity/roles directly from model arguments.
 
 Create `src/main/resources/agentguard-policy.yaml`:
 
@@ -139,17 +122,16 @@ occur after side effects; applications still need idempotency.
 
 | Module | Responsibility |
 | --- | --- |
-| `agentguard-core` | Dependency-free Java policy engine, identity/request models, permission matching, content revisions, trusted delegation lookup |
+| `agentguard-core` | Pure Java 21 policy engine, identity/request models, permission matching, content revisions, trusted delegation lookup, and metrics/tracing SPI |
 | `agentguard-policy` | YAML loading/validation and declarative policy test CLI |
-| `agentguard-audit` | Structured sanitization, `@Sensitive`, JSON/SLF4J/composite/bounded-memory publishers, execution lifecycle |
-| `agentguard-spring` | `@AgentAuthorize`, fail-closed expression resolution, Spring Security identity bridge |
-| `agentguard-spring-boot-starter` | Default beans, configuration properties, required AOP/security-core dependencies |
-| `agentguard-mcp` | Authorization-exception to error-object mapping; no implicit transport registration |
-| `agentguard-approval` | Optional exact-request approvals, expiration, rejection, atomic store SPI and reference in-memory implementation |
-| `agentguard-spring-ai` | Optional ToolCallback and ToolCallbackProvider enforcement wrappers |
-| `agentguard-spring-web` | Optional JSON `POST /v1/authorize` adapter for language-neutral clients |
+| `agentguard-audit` | Structured sanitization, `@Sensitive`, JSON/SLF4J/composite publishers, execution lifecycle |
+| `agentguard-spring` | `@AgentAuthorize`, fail-closed expression resolution, Spring Security identity bridge, Micrometer metrics |
+| `agentguard-spring-boot-starter` | Production auto-configuration, configuration properties, metrics/tracing beans |
+| `agentguard-mcp` | Authorization-exception to MCP error-object mapping; no implicit transport registration |
+| `agentguard-approval` | Exact-request approvals, cryptographic SHA-256 binding, expiration, atomic store SPI, `InMemoryApprovalStore`, and durable `PostgresApprovalStore` |
+| `agentguard-spring-ai` | `GuardedToolCallback` and `ToolCallbackProvider` pre-execution enforcement wrappers |
+| `agentguard-spring-web` | Language-neutral JSON `POST /v1/authorize` REST controller and auto-configuration |
 
-`agentguard-approval` and `agentguard-spring-ai` are new in the development version.
 The starter does not pull in an MCP server or an LLM provider.
 
 ## Policy semantics
@@ -199,13 +181,15 @@ flowchart TD
 
     subgraph HumanApproval["5. Action-Bound Approval Lifecycle"]
         Approvals -->|"Generate SHA-256 Request Hash"| Ticket["ApprovalTicket (Bound Hash, Expiry)"]
-        Ticket -->|"Human Sign-Off"| Approver["Approver Review (Single-Use Consume)"]
+        Ticket --> Store["PostgresApprovalStore / InMemoryStore\n(Row Lock: SELECT ... FOR UPDATE)"]
+        Store -->|"Human Sign-Off"| Approver["Approver Review (Single-Use Consume)"]
         Approver -->|"Valid Token"| Execute
     end
 
-    subgraph Audit["6. Audit & Evidence Trail"]
+    subgraph Governance["6. Audit & Observability"]
         Engine & Approvals & Execute -->|"Sanitized Evidence"| Sanitizer["ParameterSanitizer (Redact Secrets)"]
-        Sanitizer -->|"AuditEvent (Hash, Trace, Risk, Revision)"| Publisher["Json / SLF4J / Memory AuditPublisher"]
+        Sanitizer -->|"AuditEvent (Hash, Trace, Risk, Revision)"| Publisher["Json / SLF4J / Custom AuditPublisher"]
+        Engine & Approvals -->|"Low-Cardinality Tags"| Metrics["Micrometer Metrics & Tracing Hooks"]
     end
 
     classDef primary fill:#2563eb,stroke:#1d4ed8,color:#fff;
@@ -216,9 +200,9 @@ flowchart TD
 
     class Engine,Resolver primary;
     class Execute,Principal secure;
-    class Approvals,Ticket warning;
+    class Approvals,Ticket,Store warning;
     class Block danger;
-    class PolicySet,Lookup,Publisher,Sanitizer neutral;
+    class PolicySet,Lookup,Publisher,Sanitizer,Metrics neutral;
 ```
 
 ```text
@@ -300,6 +284,75 @@ module by using the `GuardedToolCallback` constructor that accepts an
 `ApprovalService` and TTL. The real callback stays blocked; its exception carries
 the bound approval request ID. MCP remains a small error adapter and is absent
 from the core engine.
+
+For a complete non-Java client implementation, see the [Python Cross-Language Client Example](agentguard-examples/cross-language-client/README.md).
+
+## Durable Approval Store (PostgreSQL)
+
+For clustered environments, `agentguard-approval` provides `PostgresApprovalStore`, a production-grade durable reference implementation backed by standard JDBC `DataSource`.
+
+### Features
+- **Atomic Single-Use**: Executes `SELECT ... FOR UPDATE` row-level locking during ticket transitions (`APPROVED -> CONSUMED`), preventing race conditions, concurrent consumption, or replay attacks.
+- **Index-Optimized Schema**: Includes indices on `subject_id`, `state`, and `expires_at` for high-throughput querying.
+- **Schema DDL**: Pre-built migration script available at `schema-postgresql.sql`.
+
+```java
+@Bean
+public ApprovalStore approvalStore(DataSource dataSource) {
+    return new PostgresApprovalStore(dataSource);
+}
+```
+
+```sql
+-- DDL schema in agentguard-approval/src/main/resources/schema-postgresql.sql
+CREATE TABLE IF NOT EXISTS agentguard_approvals (
+    id VARCHAR(64) PRIMARY KEY,
+    subject_id VARCHAR(128) NOT NULL,
+    action_name VARCHAR(128) NOT NULL,
+    resource_type VARCHAR(64) NOT NULL,
+    resource_id VARCHAR(128) NOT NULL,
+    request_hash VARCHAR(128) NOT NULL,
+    arguments_hash VARCHAR(128) NOT NULL,
+    policy_revision VARCHAR(128) NOT NULL,
+    environment VARCHAR(64) NOT NULL,
+    trace_id VARCHAR(128) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    state VARCHAR(32) NOT NULL,
+    decided_by VARCHAR(128)
+);
+```
+
+## Observability
+
+AgentGuard provides first-class metrics and distributed tracing integration while enforcing strict privacy invariants:
+
+### Strict Privacy Guarantee
+- **Zero Secret or PII Leakage**: Metric tags never contain agent IDs, raw resources, tool arguments, or tokens.
+- **Low-Cardinality Tags Only**: Tag dimensions are restricted to bounded enums:
+  - `decision`: `ALLOW`, `DENY`, `APPROVAL_REQUIRED`
+  - `risk`: `LOW`, `MEDIUM`, `HIGH`, `CRITICAL`
+  - `event`: `created`, `approved`, `denied`, `expired`, `consumed`
+  - `error_type`: `access_denied`, `missing_identity`, `principal_mismatch`, `invalid_environment`, `execution_failure`
+
+### Micrometer Metrics
+When `micrometer-core` is on the classpath and a `MeterRegistry` bean is available, `MicrometerAgentGuardMetrics` automatically records:
+- `agentguard.decisions` (Counter): Total authorization decisions categorized by `decision` and `risk`.
+- `agentguard.decision.duration` (Timer): Latency of policy evaluation routines.
+- `agentguard.approval.events` (Counter): Total approval lifecycle state changes.
+- `agentguard.errors` (Counter): Guard enforcement and evaluation failures.
+
+### OpenTelemetry Tracing
+Implement `AgentGuardTracingHook` to link AgentGuard audit trails and decision events directly to your distributed trace context:
+
+```java
+@Bean
+public AgentGuardTracingHook otelTracingHook() {
+    return () -> Optional.ofNullable(io.opentelemetry.api.trace.Span.current().getSpanContext().getTraceId());
+}
+```
+
+Trace IDs are captured in `AuthorizationDecision.traceId()`, `ApprovalTicket.traceId()`, and all structured `AuditEvent` records.
 
 ## Threat model
 

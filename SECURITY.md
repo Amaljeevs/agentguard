@@ -12,9 +12,9 @@ We will coordinate investigation, fixes, and disclosure with the reporter.
 
 | Version | Status |
 | --- | --- |
-| 0.2.1 | Latest release; contains verified identity, bound approvals, Spring AI, and web auto-configuration |
-| 0.2.0 | Published release |
-| 0.1.0 | Published initial release; does not include the new hardening or approval/Spring AI modules |
+| 0.2.1 | Active release; verified identity, bound approvals, Spring AI, Postgres durable store, Micrometer metrics, and REST API |
+| 0.2.0 | Previous release |
+| 0.1.0 | Initial release; does not include the new hardening or approval/Spring AI modules |
 | Older versions | Unsupported pre-release builds |
 
 See [CHANGELOG.md](CHANGELOG.md) for version-specific changes. No independent
@@ -35,7 +35,7 @@ callbacks can bypass that integration. Register only guarded Spring AI callbacks
 The library is not an operating-system sandbox and cannot constrain arbitrary
 code outside its guarded execution path.
 
-## Development-version enforcement
+## Policy enforcement invariants
 
 - Deny by default when no explicit grant or matching permission exists.
 - Explicit DENY takes precedence over grants and approval rules.
@@ -51,22 +51,20 @@ code outside its guarded execution path.
   claimed chain against looked-up ancestors.
 - Missing or invalid policy files prevent default Spring policy initialization.
 
-The published 0.1.0 only stores delegation lineage; it does not enforce the
-ancestor checks. Its expression fallback and approval precedence also differ.
-
 ## Approval storage and execution
 
-The development approval module binds tickets to identity/session, delegation
+The approval module binds tickets to identity/session, delegation
 chain, action, canonical arguments, resource, environment, expiry, and policy
 content revision with SHA-256. Separate
 approvers need `agentguard.approval.approve`; self-approval is rejected. Execution
 rechecks policy, verifies the binding and atomically consumes the ticket first.
 Failed execution does not restore a consumed ticket.
 
-The reference InMemoryApprovalStore is bounded and single-process. It is lost
-on restart and requires explicit expired-entry cleanup. Implement atomic store
-transitions in shared storage for clustered deployments. Application code owns
-business transactions, idempotency, crash recovery and reconciliation; approval
+`agentguard-approval` provides two store implementations:
+1. `InMemoryApprovalStore`: Fast, bounded, in-memory reference store for unit tests and local prototyping.
+2. `PostgresApprovalStore`: Production-ready durable store backed by standard `javax.sql.DataSource`. It leverages PostgreSQL row-level locks (`SELECT ... FOR UPDATE`) to guarantee atomic single-use state transitions (`APPROVED -> CONSUMED`) and strictly prevent double-consumption or replay across clustered application replicas. DDL schema with indexing on `subject_id`, `state`, and `expires_at` is provided in `schema-postgresql.sql`.
+
+Application code owns business transactions, idempotency, crash recovery and reconciliation; approval
 consumption is not an exactly-once distributed transaction.
 
 Use an immutable/version-consistent PolicyEngine instance during each approval

@@ -2,12 +2,12 @@
 
 ## 0.2.1
 
-### Additions and Fixes
-- `agentguard-spring-web`: Added `AgentGuardWebAutoConfiguration` for automatic Spring Boot 3 auto-configuration of `POST /v1/authorize` language-neutral REST API.
-- Added `SpiffeAgentIdentityResolver` for SPIFFE workload SVID identity parsing.
-- Added Entra ID (`oid`, `azp`, `appid`, `tid`) and Keycloak (`resource_access`) claim mapping in `JwtClaimsAgentIdentityResolver`.
-- Added 32-test adversarial & security attack suite covering privilege escalation, forged claims, approval tampering, and replay prevention.
-- Added interactive code viewer parity and Mermaid architecture diagram in README.
+### Additions and Improvements
+- **Durable Approval Store**: Added `PostgresApprovalStore` in `agentguard-approval` with `SELECT ... FOR UPDATE` row-level locking, atomic single-use ticket consumption (`CONSUMED`), index-optimized schema DDL (`schema-postgresql.sql`), and prevention of concurrent double-consumption.
+- **Observability**: Added `AgentGuardMetrics` pluggable metrics SPI and `MicrometerAgentGuardMetrics` with strictly low-cardinality labels (`decision`, `risk`, `event`, `error_type`), policy evaluation duration timer, and secret redaction. Added OpenTelemetry-compatible `AgentGuardTracingHook` SPI for distributed trace ID propagation.
+- **Language-Neutral REST API**: Added `agentguard-spring-web` auto-configuration (`AgentGuardWebAutoConfiguration`) exposing `POST /v1/authorize` with cross-language support (Python client example included).
+- **Workload & Enterprise Identity**: Added `SpiffeAgentIdentityResolver` for SPIFFE workload SVID identity resolution (`spiffe://<trust-domain>/<workload>`). Added Microsoft Entra ID (`oid`, `azp`, `appid`, `tid`) and Keycloak (`resource_access`) claim mapping in `JwtClaimsAgentIdentityResolver`.
+- **Security & Adversarial Suite**: Added comprehensive parameterized test suite covering all 15 attack vectors: privilege escalation, forged identities, delegation cycles, excessive delegation depth, expired delegation, child exceeding parent permissions, modified requests after approval, replay attacks, concurrent consumption race conditions, malformed JWT claims, malformed policies, expression evaluation errors, canonical argument hashing edge cases, wildcard permission matching, and fail-closed deny-by-default behavior.
 
 ## 0.2.0
 
@@ -63,8 +63,6 @@
 - Set `agentguard.audit.failure-mode=BEST_EFFORT` only if continuing without a
   successful audit write is acceptable. A post-execution publication failure can
   surface after a side effect; applications still need idempotency.
-- Publication is pending. Build this version locally until it is available; the two
-  published-dependency examples remain pinned to 0.1.0 and demonstrate that release.
 
 ## 0.1.0
 

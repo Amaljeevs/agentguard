@@ -58,11 +58,9 @@ see [Spring AI MCP server documentation](https://docs.spring.io/spring-ai/refere
 
 ## What is implemented
 
-**Version boundary:** Maven Central currently has `0.1.0`. This repository's new
-capabilities are `0.2.0` development code and require a local build until
-a release is published. See [CHANGELOG.md](CHANGELOG.md) for migration details.
+**Release Status:** `0.2.1` is the current published release on Maven Central. See [CHANGELOG.md](CHANGELOG.md) for full version history.
 
-| Capability | Published 0.1.0 | Development 0.2.0 |
+| Capability | Initial 0.1.0 | Current 0.2.1 |
 | --- | --- | --- |
 | Java 21 core; roles, direct permissions, wildcard matching | Yes | Yes |
 | Environment/resource rules; explicit deny precedence | Yes | Yes |
@@ -71,11 +69,12 @@ a release is published. See [CHANGELOG.md](CHANGELOG.md) for migration details.
 | Structured audit sanitization | Maps and lists, with null/DTO limitations | Nulls, maps, lists, arrays, records, bean getters, `@Sensitive`, cycle/depth limits |
 | Reusable JSON audit logger | Example-only implementation | Library publisher with sanitized parameters/metadata |
 | Execution outcome audit | Not provided | Authorization, success and failure events with correlation and policy revision |
-| Verified identity | Spring principal/name mapping | Extensible resolver plus verified JWT claim mapping for subject, client, actor, tenant, scopes and delegation |
+| Verified identity | Spring principal/name mapping | Extensible resolver plus verified JWT claim mapping for subject, client, actor, tenant, scopes, Entra ID, Keycloak, and SPIFFE SVIDs |
 | Delegation | Identity metadata only | Full-chain verification, permission-subset enforcement, bounded depth and audit evidence |
-| Approval workflow primitives | Example-specific application workflow | Optional `agentguard-approval` module with atomic store SPI |
+| Approval workflow primitives | Example-specific application workflow | `agentguard-approval` module with `InMemoryApprovalStore` and durable `PostgresApprovalStore` |
 | MCP integration | Exception-to-error mapping | Mapping plus optional Spring AI callback adapter and real MCP transport example |
-| Language-neutral API | Not provided | Optional `POST /v1/authorize` Spring MVC adapter |
+| Language-neutral API | Not provided | Auto-configured `POST /v1/authorize` Spring MVC adapter |
+| Observability & Tracing | Not provided | Micrometer metrics (`agentguard.decisions`, latency, approvals) and OpenTelemetry tracing hook |
 | Policy test CLI and benchmark harness | Not provided | Included |
 
 The core remains independent of Spring. Audit, approval, Spring, and Spring AI
@@ -145,8 +144,7 @@ services, with tests that exercise failures as well as successful calls.
 The implemented modules provide a base for these **future directions**, which
 are not current guarantees:
 
-- Shared transactional approval-store implementations and administrative review
-  interfaces, with tenant isolation, retention and operational controls.
+- Administrative approval review web dashboards, retention cleanup jobs, and tenant isolation policies.
 - External policy-engine adapters and safe policy rollout/version management.
 - OpenTelemetry exporters and integrations with existing audit retention systems.
 - Additional provider-specific adapters and revocation hooks for Keycloak,

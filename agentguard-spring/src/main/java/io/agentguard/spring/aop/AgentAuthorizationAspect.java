@@ -45,6 +45,7 @@ public class AgentAuthorizationAspect {
     private final AuditEventPublisher auditPublisher;
     private final ParameterSanitizer parameterSanitizer;
     private final String defaultEnvironment;
+    private final io.agentguard.core.metrics.AgentGuardMetrics metrics;
 
     private final ExpressionParser spelParser = new SpelExpressionParser();
     private final ParameterNameDiscoverer paramNameDiscoverer = new DefaultParameterNameDiscoverer();
@@ -56,12 +57,24 @@ public class AgentAuthorizationAspect {
         ParameterSanitizer parameterSanitizer,
         String defaultEnvironment
     ) {
+        this(policyEngine, identityResolver, auditPublisher, parameterSanitizer, defaultEnvironment, io.agentguard.core.metrics.AgentGuardMetrics.NOOP);
+    }
+
+    public AgentAuthorizationAspect(
+        PolicyEngine policyEngine,
+        AgentIdentityResolver identityResolver,
+        AuditEventPublisher auditPublisher,
+        ParameterSanitizer parameterSanitizer,
+        String defaultEnvironment,
+        io.agentguard.core.metrics.AgentGuardMetrics metrics
+    ) {
         this.policyEngine = Objects.requireNonNull(policyEngine, "policyEngine must not be null");
         this.identityResolver = Objects.requireNonNull(identityResolver, "identityResolver must not be null");
         this.auditPublisher = Objects.requireNonNull(auditPublisher, "auditPublisher must not be null");
         this.parameterSanitizer = parameterSanitizer != null ? parameterSanitizer : new DefaultParameterSanitizer();
         this.defaultEnvironment = (defaultEnvironment != null && !defaultEnvironment.isBlank())
             ? defaultEnvironment : "development";
+        this.metrics = metrics != null ? metrics : io.agentguard.core.metrics.AgentGuardMetrics.NOOP;
     }
 
     @Around("@annotation(agentAuthorize)")
@@ -73,6 +86,7 @@ public class AgentAuthorizationAspect {
         // 1. Resolve active AgentIdentity
         Optional<AgentIdentity> identityOpt = identityResolver.resolveCurrentIdentity();
         if (identityOpt.isEmpty()) {
+            metrics.recordError("missing_identity");
             throw new AgentAccessDeniedException("AgentGuard authorization DENIED: No authenticated agent identity found in context");
         }
         AgentIdentity subject = identityOpt.get();
@@ -104,7 +118,7 @@ public class AgentAuthorizationAspect {
             AuthorizationContext.of(environment)
         );
 
-        return new AuthorizationExecutor(policyEngine, auditPublisher, parameterSanitizer)
+        return new AuthorizationExecutor(policyEngine, auditPublisher, parameterSanitizer, (req, dec) -> Optional.empty(), metrics)
             .execute(request, joinPoint::proceed);
     }
 
