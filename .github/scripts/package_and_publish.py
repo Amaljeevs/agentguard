@@ -21,7 +21,7 @@ def get_project_version():
             return v.text.strip()
     except Exception as e:
         print(f"Warning: Could not parse version from pom.xml: {e}")
-    return "0.2.0"
+    return "0.2.1"
 
 def clean_staging_directory(staging_dir):
     """Purge any non-artifact or metadata files that cause Sonatype validation errors."""

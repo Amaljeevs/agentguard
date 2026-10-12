@@ -1,6 +1,15 @@
 # Changelog
 
-## 0.2.0 — prepared for release; publication pending
+## 0.2.1
+
+### Additions and Fixes
+- `agentguard-spring-web`: Added `AgentGuardWebAutoConfiguration` for automatic Spring Boot 3 auto-configuration of `POST /v1/authorize` language-neutral REST API.
+- Added `SpiffeAgentIdentityResolver` for SPIFFE workload SVID identity parsing.
+- Added Entra ID (`oid`, `azp`, `appid`, `tid`) and Keycloak (`resource_access`) claim mapping in `JwtClaimsAgentIdentityResolver`.
+- Added 32-test adversarial & security attack suite covering privilege escalation, forged claims, approval tampering, and replay prevention.
+- Added interactive code viewer parity and Mermaid architecture diagram in README.
+
+## 0.2.0
 
 ### Security and behavior changes
 

@@ -58,7 +58,7 @@ public class McpConfiguration {
                 return orders.request(tool, arguments, identity);
             }, engine, audit, sanitizer, approvals, Duration.ofMinutes(5)));
         }
-        return McpServer.sync(transport).serverInfo("agentguard-orders", "0.2.0")
+        return McpServer.sync(transport).serverInfo("agentguard-orders", "0.2.1")
             .capabilities(McpSchema.ServerCapabilities.builder().tools(true).build())
             .tools(McpToolUtils.toSyncToolSpecifications(callbacks.toArray(ToolCallback[]::new))).build();
     }

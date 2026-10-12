@@ -12,7 +12,8 @@ We will coordinate investigation, fixes, and disclosure with the reporter.
 
 | Version | Status |
 | --- | --- |
-| 0.2.0 | Unreleased development code; contains the hardening described below |
+| 0.2.1 | Latest release; contains verified identity, bound approvals, Spring AI, and web auto-configuration |
+| 0.2.0 | Published release |
 | 0.1.0 | Published initial release; does not include the new hardening or approval/Spring AI modules |
 | Older versions | Unsupported pre-release builds |
 

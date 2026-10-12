@@ -13,9 +13,8 @@ AgentGuard governs the business action that an authenticated agent proposes.
 Read [why-agentguard.md](why-agentguard.md) for the comparison, supported use cases,
 and future directions.
 
-**Release status:** `0.1.0` is published on Maven Central. The code on this branch
-is **`0.2.0`, prepared for release; publication pending**. New approval and Spring AI modules require a
-local build. See [CHANGELOG.md](CHANGELOG.md) for behavior changes and migration.
+**Release status:** `0.1.0` and `0.2.0` are published on Maven Central. The latest code
+is **`0.2.1`**. See [CHANGELOG.md](CHANGELOG.md) for behavior changes and migration.
 
 ## Try a runnable app
 
@@ -63,13 +62,13 @@ modules and propagates authenticated identity over real Streamable HTTP MCP.
 
 ## Integrate the development starter
 
-Until 0.2.0 is published, install it locally, then add this dependency to a Spring Boot app:
+Add this dependency to a Spring Boot app:
 
 ```xml
 <dependency>
     <groupId>io.github.amaljeevs</groupId>
     <artifactId>agentguard-spring-boot-starter</artifactId>
-    <version>0.2.0</version>
+    <version>0.2.1</version>
 </dependency>
 ```
 
@@ -358,8 +357,8 @@ Report vulnerabilities privately using [SECURITY.md](SECURITY.md).
 The group ID is `io.github.amaljeevs`. Publishing is a maintainer release action:
 select an unused non-SNAPSHOT release version, run all checks, configure Central
 credentials/signing, then use `./mvnw clean deploy -P release` (Windows:
-`./mvnw.cmd clean deploy -P release`). Version `0.2.0` is
-prepared for publishing; this does not itself deploy artifacts or overwrite 0.1.0.
+`./mvnw.cmd clean deploy -P release`). Version `0.2.1` is
+prepared for publishing; this does not itself deploy artifacts or overwrite earlier releases.
 
 To publish through GitHub Actions, run **Publish to Maven Central** on the updated
 `main` branch, or publish a release whose tag points to the release-version commit.

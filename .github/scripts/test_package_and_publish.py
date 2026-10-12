@@ -7,17 +7,17 @@ class PackageAndPublishTest(unittest.TestCase):
     def test_cleans_metadata_and_loose_files(self):
         with tempfile.TemporaryDirectory() as td:
             # 2 valid modules: agentguard-core and agentguard-parent
-            core_dir = os.path.join(td, "io", "github", "amaljeevs", "agentguard-core", "0.2.0")
-            parent_dir = os.path.join(td, "io", "github", "amaljeevs", "agentguard-parent", "0.2.0")
+            core_dir = os.path.join(td, "io", "github", "amaljeevs", "agentguard-core", "0.2.1")
+            parent_dir = os.path.join(td, "io", "github", "amaljeevs", "agentguard-parent", "0.2.1")
             os.makedirs(core_dir)
             os.makedirs(parent_dir)
 
             # Valid files
-            core_pom = os.path.join(core_dir, "agentguard-core-0.2.0.pom")
-            core_pom_asc = os.path.join(core_dir, "agentguard-core-0.2.0.pom.asc")
-            core_jar = os.path.join(core_dir, "agentguard-core-0.2.0.jar")
-            parent_pom = os.path.join(parent_dir, "agentguard-parent-0.2.0.pom")
-            parent_pom_asc = os.path.join(parent_dir, "agentguard-parent-0.2.0.pom.asc")
+            core_pom = os.path.join(core_dir, "agentguard-core-0.2.1.pom")
+            core_pom_asc = os.path.join(core_dir, "agentguard-core-0.2.1.pom.asc")
+            core_jar = os.path.join(core_dir, "agentguard-core-0.2.1.jar")
+            parent_pom = os.path.join(parent_dir, "agentguard-parent-0.2.1.pom")
+            parent_pom_asc = os.path.join(parent_dir, "agentguard-parent-0.2.1.pom.asc")
 
             for path in [core_pom, core_pom_asc, core_jar, parent_pom, parent_pom_asc]:
                 with open(path, "w") as f:

@@ -573,7 +573,7 @@ class SpringMcpExampleApplicationTest {
 <dependency>
     <groupId>io.github.amaljeevs</groupId>
     <artifactId>agentguard-spring-boot-starter</artifactId>
-    <version>0.2.0</version>
+    <version>0.2.1</version>
 </dependency>
 
 ## 2. Define Policy (agentguard-policy.yaml)
@@ -660,7 +660,7 @@ public final class AgentGuardAuthorizationApi {
     content: `<project>
     <groupId>io.github.amaljeevs</groupId>
     <artifactId>agentguard-parent</artifactId>
-    <version>0.2.0</version>
+    <version>0.2.1</version>
     <packaging>pom</packaging>
     <modules>
         <module>agentguard-core</module>
