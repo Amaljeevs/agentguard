@@ -98,7 +98,7 @@ def validate_and_checksum(staging_dir):
 
     print(f"Validated {len(components)} components successfully:")
     for comp in sorted(components):
-        print(f"  ✓ {comp}")
+        print(f"  OK {comp}")
     print()
 
 def package_bundle(staging_dir, bundle_path):
