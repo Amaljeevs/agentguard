@@ -616,6 +616,42 @@ public QueryResult queryDatabase(String query) { ... }`
 }`
   },
   {
+    name: 'AgentGuardAuthorizationApi.java',
+    path: 'agentguard-spring-web/src/main/java/io/agentguard/web/api/AgentGuardAuthorizationApi.java',
+    module: 'agentguard-spring-web',
+    language: 'java',
+    description: 'Protocol service behind POST /v1/authorize; enforces verified identity and produces language-neutral authorization decisions.',
+    content: `package io.agentguard.web.api;
+
+import io.agentguard.approval.ApprovalService;
+import io.agentguard.audit.model.AuditEvent;
+import io.agentguard.core.engine.PolicyEngine;
+import io.agentguard.core.identity.AgentIdentityResolver;
+import io.agentguard.core.model.*;
+import java.util.*;
+
+public final class AgentGuardAuthorizationApi {
+    private final PolicyEngine engine;
+    private final AgentIdentityResolver identities;
+
+    public AuthorizationApiResponse authorize(AuthorizationApiRequest input) {
+        // 1. Resolve verified agent identity (never trust payload roles)
+        AgentIdentity identity = identities.resolveCurrentIdentity()
+            .orElseThrow(() -> new AgentAccessDeniedException("Authenticated identity required"));
+
+        // 2. Build canonical authorization request
+        var request = AuthorizationRequest.of(identity, Action.of(input.action(), input.arguments()),
+            Resource.of(input.resource().type(), input.resource().id()),
+            AuthorizationContext.of(input.context().get("environment").toString()));
+
+        // 3. Evaluate via PolicyEngine PDP and return language-neutral response
+        AuthorizationDecision decision = engine.evaluate(request);
+        return new AuthorizationApiResponse(decision.decision(), decision.reason(),
+            decision.matchedPolicyId().orElse(null), decision.riskLevel(), decision.traceId());
+    }
+}`
+  },
+  {
     name: 'pom.xml',
     path: 'pom.xml',
     module: 'root',
@@ -635,6 +671,7 @@ public QueryResult queryDatabase(String query) { ... }`
         <module>agentguard-mcp</module>
         <module>agentguard-approval</module>
         <module>agentguard-spring-ai</module>
+        <module>agentguard-spring-web</module>
     </modules>
 </project>`
   }

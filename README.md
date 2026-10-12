@@ -169,6 +169,55 @@ See the [policy specification](specification/docs/POLICY_SPECIFICATION.md) and
 
 ## Architecture and trust flow
 
+```mermaid
+flowchart TD
+    subgraph Identity["1. Verified Agent Identity (Zero Trust)"]
+        IdP["Keycloak / Entra / SPIFFE / OAuth2"] -->|"JWT / mTLS / SVID"| Resolver["AgentIdentityResolver"]
+        Resolver -->|"VerifiedClaims (sub, tid, actor, delegation)"| Principal["Verified AgentIdentity Principal"]
+    end
+
+    subgraph Entrypoints["2. Policy Enforcement Points (PEP)"]
+        Principal -.-> AOP["Spring AOP: @AgentAuthorize"]
+        Principal -.-> SAI["Spring AI: GuardedToolCallback"]
+        Principal -.-> HTTP["REST API: POST /v1/authorize"]
+    end
+
+    subgraph Evaluation["3. Policy Decision Point (PDP)"]
+        AOP & SAI & HTTP -->|"AuthorizationRequest"| Engine["DefaultPolicyEngine"]
+        PolicySet["PolicySet (YAML / Rules / Hash)"] --> Engine
+        Lookup["AgentIdentityLookup"] -->|"Verify Ancestor Chain & Depth"| Engine
+    end
+
+    subgraph Decisions["4. Decision & Enforcement"]
+        Engine -->|"ALLOW"| Execute["Execute Action / MCP Tool"]
+        Engine -->|"DENY"| Block["Throw AgentAccessDeniedException"]
+        Engine -->|"APPROVAL_REQUIRED"| Approvals["ApprovalService"]
+    end
+
+    subgraph HumanApproval["5. Action-Bound Approval Lifecycle"]
+        Approvals -->|"Generate SHA-256 Request Hash"| Ticket["ApprovalTicket (Bound Hash, Expiry)"]
+        Ticket -->|"Human Sign-Off"| Approver["Approver Review (Single-Use Consume)"]
+        Approver -->|"Valid Token"| Execute
+    end
+
+    subgraph Audit["6. Audit & Evidence Trail"]
+        Engine & Approvals & Execute -->|"Sanitized Evidence"| Sanitizer["ParameterSanitizer (Redact Secrets)"]
+        Sanitizer -->|"AuditEvent (Hash, Trace, Risk, Revision)"| Publisher["Json / SLF4J / Memory AuditPublisher"]
+    end
+
+    classDef primary fill:#2563eb,stroke:#1d4ed8,color:#fff;
+    classDef secure fill:#059669,stroke:#047857,color:#fff;
+    classDef warning fill:#d97706,stroke:#b45309,color:#fff;
+    classDef danger fill:#dc2626,stroke:#b91c1c,color:#fff;
+    classDef neutral fill:#1e293b,stroke:#334155,color:#e2e8f0;
+
+    class Engine,Resolver primary;
+    class Execute,Principal secure;
+    class Approvals,Ticket warning;
+    class Block danger;
+    class PolicySet,Lookup,Publisher,Sanitizer neutral;
+```
+
 ```text
 OAuth/OIDC, mTLS or SPIFFE verifier
                 |
