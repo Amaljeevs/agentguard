@@ -9,7 +9,7 @@ import java.util.*;
 
 /** Maps already-verified JWT claims into an immutable AgentGuard identity. */
 public final class JwtClaimsAgentIdentityResolver implements AgentIdentityResolver {
-    private static final Set<String> SAFE_ATTRIBUTES = Set.of("sub", "client_id", "tenant", "tid", "iss", "jti");
+    private static final Set<String> SAFE_ATTRIBUTES = Set.of("sub", "client_id", "azp", "appid", "oid", "tenant", "tid", "iss", "jti");
     private final VerifiedClaimsSource source;
     private final Clock clock;
 
@@ -28,10 +28,10 @@ public final class JwtClaimsAgentIdentityResolver implements AgentIdentityResolv
     public AgentIdentity resolve(VerifiedClaims verified) {
         Objects.requireNonNull(verified, "verified");
         Map<String, Object> claims = verified.claims();
-        String subject = optionalString(claims, "sub");
-        String clientId = optionalString(claims, "client_id");
+        String subject = first(optionalString(claims, "sub"), optionalString(claims, "oid"));
+        String clientId = first(optionalString(claims, "client_id"), optionalString(claims, "azp"), optionalString(claims, "appid"));
         String agentId = clientId != null ? clientId : subject;
-        if (agentId == null) throw malformed("sub or client_id is required");
+        if (agentId == null) throw malformed("sub, client_id, azp, appid or oid is required");
         Instant issuedAt = instant(claims.get("iat"), "iat", true);
         Instant expiresAt = instant(claims.get("exp"), "exp", false);
         Instant now = clock.instant();
@@ -46,6 +46,18 @@ public final class JwtClaimsAgentIdentityResolver implements AgentIdentityResolv
             roles = Set.copyOf(combined);
         } else if (realmAccess != null && !(realmAccess instanceof Map<?, ?>)) {
             throw malformed("realm_access must be an object");
+        }
+        Object resourceAccess = claims.get("resource_access");
+        if (resourceAccess instanceof Map<?, ?> resMap) {
+            var combined = new LinkedHashSet<>(roles);
+            for (Object clientVal : resMap.values()) {
+                if (clientVal instanceof Map<?, ?> clientMap && clientMap.get("roles") != null) {
+                    combined.addAll(strings(clientMap.get("roles"), "resource_access.roles"));
+                }
+            }
+            roles = Set.copyOf(combined);
+        } else if (resourceAccess != null) {
+            throw malformed("resource_access must be an object");
         }
         Set<String> scopes = new LinkedHashSet<>(strings(claims.get("scp"), "scp"));
         scopes.addAll(strings(claims.get("scope"), "scope"));
@@ -116,7 +128,12 @@ public final class JwtClaimsAgentIdentityResolver implements AgentIdentityResolv
         if (text.isBlank()) throw malformed(claim + " must not be blank");
         return text;
     }
-    private static String first(String first, String second) { return first != null ? first : second; }
+    private static String first(String... candidates) {
+        for (String candidate : candidates) {
+            if (candidate != null) return candidate;
+        }
+        return null;
+    }
     private static AgentAuthenticationException malformed(String reason) {
         return new AgentAuthenticationException("Malformed verified JWT claims: " + reason);
     }

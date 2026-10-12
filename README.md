@@ -194,9 +194,11 @@ OAuth/OIDC, mTLS or SPIFFE verifier
 `AgentIdentityResolver` is the trust boundary. The built-in JWT claim mapper only
 accepts `VerifiedClaims`, which an upstream Keycloak, Entra, Spring Security,
 SPIFFE-JWT or custom verifier must produce after validating signature, issuer,
-audience and token lifetime. It maps `sub`, `client_id`, `actor`, `tenant`/`tid`,
-`scope`/`scp`, roles and `delegation_chain`. Request JSON and model tool arguments
-never supply effective agent IDs, roles or permissions.
+audience and token lifetime. It maps `sub`, `client_id`, `azp`/`appid`, `oid`, `actor`,
+`tenant`/`tid`, `scope`/`scp`, Keycloak realm/resource roles (`realm_access`, `resource_access`),
+and `delegation_chain`. Dedicated `SpiffeAgentIdentityResolver` resolves workload SVIDs
+(`spiffe://<trust-domain>/<workload>`) directly into isolated tenant and agent identities.
+Request JSON and model tool arguments never supply effective agent IDs, roles or permissions.
 
 For plain Java use, no server is required:
 
