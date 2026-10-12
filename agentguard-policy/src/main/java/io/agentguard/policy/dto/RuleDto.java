@@ -17,6 +17,9 @@ public record RuleDto(
     @JsonProperty(value = "effect", required = true)
     String effect,
 
+    @JsonProperty("risk")
+    String risk,
+
     @JsonProperty("target")
     TargetDto target
 ) {}

@@ -1,6 +1,7 @@
 version: "1.0"
 metadata:
   name: mcp-orders
+  version: "2026-10"
 roles:
   developer:
     permissions: [orders.read, orders.refund]
@@ -19,6 +20,7 @@ rules:
           equals: production
   - id: production-refund-review
     effect: APPROVAL_REQUIRED
+    risk: HIGH
     target:
       actions: [orders.refund]
       conditions:

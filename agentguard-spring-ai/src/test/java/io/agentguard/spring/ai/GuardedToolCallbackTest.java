@@ -12,6 +12,8 @@ import org.springframework.ai.tool.definition.ToolDefinition;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import static org.assertj.core.api.Assertions.*;
+import io.agentguard.approval.*;
+import java.time.*;
 
 class GuardedToolCallbackTest {
     private final AtomicInteger calls = new AtomicInteger();
@@ -55,6 +57,22 @@ class GuardedToolCallbackTest {
     @Test void modelSuppliedIdentityCannotOverrideTrustedContext() {
         assertThatThrownBy(() -> guarded(false).call("{\"roles\":[\"admin\"],\"environment\":\"development\"}", context(null)))
             .isInstanceOf(AgentAccessDeniedException.class);
+        assertThat(calls).hasValue(0);
+    }
+    @Test void approvalRequiredToolCallCreatesBoundTicketAndStillDoesNotExecute() {
+        var policy = PolicySet.builder("test", "1").rules(List.of(
+            PolicyRule.builder("review", RuleEffect.APPROVAL_REQUIRED).targetActions(Set.of("refund")).build())).build();
+        var engine = new DefaultPolicyEngine(policy);
+        var store = new InMemoryApprovalStore();
+        var approvals = new ApprovalService(engine, store, Clock.systemUTC(), audit, new DefaultParameterSanitizer());
+        var guarded = new GuardedToolCallback(tool, (name, args, toolContext) -> AuthorizationRequest.of(
+            (AgentIdentity) toolContext.getContext().get("trusted-agent"), Action.of(name), Resource.of("order", "1"),
+            AuthorizationContext.of("production")), engine, audit, new DefaultParameterSanitizer(), approvals, Duration.ofMinutes(5));
+
+        var thrown = catchThrowable(() -> guarded.call("{\"amount\":10}", context("refund")));
+        assertThat(thrown).isInstanceOf(AgentApprovalRequiredException.class);
+        String approvalId = ((AgentApprovalRequiredException) thrown).getApprovalRequestId().orElseThrow();
+        assertThat(store.find(approvalId).orElseThrow().state()).isEqualTo(ApprovalTicket.State.APPROVAL_REQUIRED);
         assertThat(calls).hasValue(0);
     }
 }

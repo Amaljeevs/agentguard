@@ -48,6 +48,7 @@
         <module>agentguard-mcp</module>
         <module>agentguard-approval</module>
         <module>agentguard-spring-ai</module>
+        <module>agentguard-spring-web</module>
     </modules>
 
     <properties>
@@ -83,6 +84,11 @@
             <dependency>
                 <groupId>io.github.amaljeevs</groupId>
                 <artifactId>agentguard-spring-ai</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.amaljeevs</groupId>
+                <artifactId>agentguard-spring-web</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

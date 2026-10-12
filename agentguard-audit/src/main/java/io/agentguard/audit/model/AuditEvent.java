@@ -2,25 +2,12 @@ package io.agentguard.audit.model;
 
 import io.agentguard.audit.sanitizer.DefaultParameterSanitizer;
 import io.agentguard.audit.sanitizer.ParameterSanitizer;
-import io.agentguard.core.model.AgentIdentity;
-import io.agentguard.core.model.AgentType;
-import io.agentguard.core.model.AuthorizationDecision;
-import io.agentguard.core.model.AuthorizationRequest;
-import io.agentguard.core.model.Decision;
-
+import io.agentguard.core.model.*;
+import io.agentguard.core.security.RequestFingerprint;
 import java.time.Instant;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
-import java.util.Collections;
-import java.util.LinkedHashMap;
+import java.util.*;
 
-/**
- * Immutable audit record representing an evaluated authorization decision.
- * All sensitive action parameters are sanitized prior to event construction.
- */
+/** Immutable authorization evidence. Parameters are sanitized; publishers should prefer argumentsHash. */
 public record AuditEvent(
     String eventId,
     Instant timestamp,
@@ -38,17 +25,33 @@ public record AuditEvent(
     Optional<String> matchedRuleId,
     Optional<String> delegatedBy,
     Optional<String> sessionId,
-    Map<String, Object> metadata
+    Map<String, Object> metadata,
+    List<String> delegationChain,
+    String argumentsHash,
+    Optional<String> policyVersion,
+    Optional<String> policyHash,
+    RiskLevel riskLevel,
+    String traceId,
+    Optional<String> approvalRequestId
 ) {
-    public AuditEvent {
-        Objects.requireNonNull(eventId, "eventId must not be null");
-        Objects.requireNonNull(timestamp, "timestamp must not be null");
-        Objects.requireNonNull(agentId, "agentId must not be null");
-        Objects.requireNonNull(agentType, "agentType must not be null");
-        Objects.requireNonNull(action, "action must not be null");
-        Objects.requireNonNull(decision, "decision must not be null");
-        Objects.requireNonNull(reason, "reason must not be null");
+    /** Original constructor retained for source compatibility. */
+    public AuditEvent(String eventId, Instant timestamp, String agentId, AgentType agentType, Set<String> roles,
+                      String action, Map<String, Object> parameters, String resourceType, String resourceId,
+                      String environment, Decision decision, String reason, Optional<String> matchedPolicyName,
+                      Optional<String> matchedRuleId, Optional<String> delegatedBy, Optional<String> sessionId,
+                      Map<String, Object> metadata) {
+        this(eventId, timestamp, agentId, agentType, roles, action, parameters, resourceType, resourceId,
+            environment, decision, reason, matchedPolicyName, matchedRuleId, delegatedBy, sessionId, metadata,
+            delegatedBy.map(List::of).orElseGet(List::of), RequestFingerprint.argumentsHash(parameters),
+            Optional.empty(), Optional.empty(), decision == Decision.ALLOW ? RiskLevel.LOW : RiskLevel.MEDIUM,
+            eventId, Optional.empty());
+    }
 
+    public AuditEvent {
+        Objects.requireNonNull(eventId, "eventId"); Objects.requireNonNull(timestamp, "timestamp");
+        Objects.requireNonNull(agentId, "agentId"); Objects.requireNonNull(agentType, "agentType");
+        Objects.requireNonNull(action, "action"); Objects.requireNonNull(decision, "decision");
+        Objects.requireNonNull(reason, "reason");
         roles = roles == null ? Set.of() : Set.copyOf(roles);
         parameters = parameters == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(parameters));
         matchedPolicyName = matchedPolicyName == null ? Optional.empty() : matchedPolicyName;
@@ -56,54 +59,41 @@ public record AuditEvent(
         delegatedBy = delegatedBy == null ? Optional.empty() : delegatedBy;
         sessionId = sessionId == null ? Optional.empty() : sessionId;
         metadata = metadata == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(metadata));
+        delegationChain = delegationChain == null ? List.of() : List.copyOf(delegationChain);
+        Objects.requireNonNull(argumentsHash, "argumentsHash");
+        policyVersion = policyVersion == null ? Optional.empty() : policyVersion;
+        policyHash = policyHash == null ? Optional.empty() : policyHash;
+        riskLevel = riskLevel == null ? RiskLevel.MEDIUM : riskLevel;
+        Objects.requireNonNull(traceId, "traceId");
+        approvalRequestId = approvalRequestId == null ? Optional.empty() : approvalRequestId;
     }
 
-    /**
-     * Constructs an AuditEvent from an AuthorizationRequest and its resulting AuthorizationDecision,
-     * applying the provided ParameterSanitizer.
-     */
-    public static AuditEvent from(
-        AuthorizationRequest request,
-        AuthorizationDecision decision,
-        ParameterSanitizer sanitizer
-    ) {
-        Objects.requireNonNull(request, "request must not be null");
-        Objects.requireNonNull(decision, "decision must not be null");
-        ParameterSanitizer activeSanitizer = sanitizer != null ? sanitizer : new DefaultParameterSanitizer();
-
+    public static AuditEvent from(AuthorizationRequest request, AuthorizationDecision decision,
+                                  ParameterSanitizer sanitizer) {
+        Objects.requireNonNull(request, "request"); Objects.requireNonNull(decision, "decision");
+        ParameterSanitizer active = sanitizer != null ? sanitizer : new DefaultParameterSanitizer();
         AgentIdentity subject = request.subject();
-        Map<String, Object> sanitizedParams = activeSanitizer.sanitize(request.action().parameters());
-
-        return new AuditEvent(
-            UUID.randomUUID().toString(),
-            decision.evaluatedAt() != null ? decision.evaluatedAt() : Instant.now(),
-            subject != null ? subject.agentId() : "ANONYMOUS",
-            subject != null ? subject.agentType() : AgentType.WORKER,
-            subject != null ? subject.roles() : Set.of(),
-            request.action().name(),
-            sanitizedParams,
-            request.resource().type(),
-            request.resource().id(),
-            request.context().environment(),
-            decision.decision(),
-            decision.reason(),
-            decision.matchedPolicyName(),
-            decision.matchedRuleId(),
-            subject != null ? subject.delegatedBy() : Optional.empty(),
-            subject != null ? subject.sessionId() : Optional.empty(),
-            activeSanitizer.sanitize(request.context().metadata())
-        );
+        return new AuditEvent(UUID.randomUUID().toString(), decision.evaluatedAt(), subject.agentId(),
+            subject.agentType(), subject.roles(), request.action().name(), active.sanitize(request.action().parameters()),
+            request.resource().type(), request.resource().id(), request.context().environment(), decision.decision(),
+            decision.reason(), decision.matchedPolicyName(), decision.matchedRuleId(), subject.delegatedBy(),
+            subject.sessionId(), active.sanitize(request.context().metadata()), subject.delegationChain(),
+            RequestFingerprint.argumentsHash(request.action().parameters()), decision.policyVersion(),
+            decision.policyHash(), decision.riskLevel(), decision.traceId(), Optional.empty());
     }
 
     /** Adds trusted lifecycle metadata while retaining the sanitized request snapshot. */
     public AuditEvent lifecycle(String phase, String correlationId, String policyRevision, Map<String, Object> details) {
         var extra = new LinkedHashMap<>(metadata);
-        extra.putAll(details);
-        extra.put("phase", phase);
-        extra.put("correlationId", correlationId);
-        extra.put("policyRevision", policyRevision);
+        if (details != null) extra.putAll(details);
+        extra.put("phase", phase); extra.put("correlationId", correlationId); extra.put("policyRevision", policyRevision);
+        Optional<String> approval = approvalRequestId;
+        if (phase != null && phase.startsWith("APPROVAL_")) approval = Optional.ofNullable(correlationId);
+        Object explicit = extra.get("approvalRequestId");
+        if (explicit instanceof String id && !id.isBlank()) approval = Optional.of(id);
         return new AuditEvent(UUID.randomUUID().toString(), Instant.now(), agentId, agentType, roles, action,
-            parameters, resourceType, resourceId, environment, decision, reason, matchedPolicyName,
-            matchedRuleId, delegatedBy, sessionId, extra);
+            parameters, resourceType, resourceId, environment, decision, reason, matchedPolicyName, matchedRuleId,
+            delegatedBy, sessionId, extra, delegationChain, argumentsHash, policyVersion, policyHash, riskLevel,
+            traceId, approval);
     }
 }

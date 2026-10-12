@@ -8,7 +8,8 @@
 
 AgentGuard evaluates who may perform an action on a resource in a particular
 environment, stops denied or unapproved calls, and records structured evidence.
-It complements Spring Security's authentication and authorization facilities.
+OAuth/OIDC and Spring Security authenticate the caller and validate JWTs;
+AgentGuard governs the business action that an authenticated agent proposes.
 Read [why-agentguard.md](why-agentguard.md) for the comparison, supported use cases,
 and future directions.
 
@@ -82,12 +83,14 @@ Create `src/main/resources/agentguard-policy.yaml`:
 version: "1.0"
 metadata:
   name: order-governance
+  version: "2026-10"
 roles:
   operator:
     permissions: [orders.read, orders.refund]
 rules:
   - id: production-refund-review
     effect: APPROVAL_REQUIRED
+    risk: HIGH
     target:
       actions: [orders.refund]
       conditions:
@@ -98,9 +101,9 @@ rules:
 Protect Spring-managed service methods:
 
 ```java
-@AgentAuthorize(action = "orders.refund", resourceType = "order",
-    resourceId = "#p0", environment = "production")
-public void refund(long orderId) {
+@AgentAuthorize(action = "kubernetes.deploy", resourceType = "cluster",
+    resource = "#cluster", environment = "production")
+public void deploy(String cluster) {
     // Application SQL/client operation, executed only after authorization allows it.
 }
 ```
@@ -122,8 +125,9 @@ agentguard:
     failure-mode: FAIL_CLOSED
 ```
 
-The default JSON audit logger is `io.agentguard.audit.json`. It records sanitized
-parameters and metadata. Authorization and execution outcomes are separate,
+The default JSON audit logger is `io.agentguard.audit.json`. It records a SHA-256
+arguments fingerprint, delegation chain, policy version/hash, risk and trace ID;
+it does not emit raw arguments. Authorization and execution outcomes are separate,
 correlated events. `BEST_EFFORT` is available when continuing after an audit sink
 failure is an explicit application decision. Post-execution logging failure may
 occur after side effects; applications still need idempotency.
@@ -140,6 +144,7 @@ occur after side effects; applications still need idempotency.
 | `agentguard-mcp` | Authorization-exception to error-object mapping; no implicit transport registration |
 | `agentguard-approval` | Optional exact-request approvals, expiration, rejection, atomic store SPI and reference in-memory implementation |
 | `agentguard-spring-ai` | Optional ToolCallback and ToolCallbackProvider enforcement wrappers |
+| `agentguard-spring-web` | Optional JSON `POST /v1/authorize` adapter for language-neutral clients |
 
 `agentguard-approval` and `agentguard-spring-ai` are new in the development version.
 The starter does not pull in an MCP server or an LLM provider.
@@ -149,8 +154,10 @@ The starter does not pull in an MCP server or an LLM provider.
 Identity validity and explicit DENY rules are checked first. An explicit ALLOW or
 role/direct permission must grant the action before a matching approval rule can
 return APPROVAL_REQUIRED. Otherwise the result is DENY. For delegation, the
-request must be eligible for both child and every trusted ancestor; unknown
-parents, cycles, excessive depth and invalid temporal bounds deny.
+request must be eligible for both child and every trusted ancestor. The child's
+complete effective permission set must also be a conservative subset of its
+parent's authority. Unknown parents, inconsistent chains, privilege expansion,
+cycles, excessive depth and invalid temporal bounds deny.
 
 A configured expression that cannot resolve is denied; it does not silently
 change the environment. Use trusted resource metadata for environments. The
@@ -159,6 +166,102 @@ production callers must supply a trusted current clock.
 
 See the [policy specification](specification/docs/POLICY_SPECIFICATION.md) and
 [security boundaries](SECURITY.md).
+
+## Architecture and trust flow
+
+```text
+OAuth/OIDC, mTLS or SPIFFE verifier
+                |
+                v
+       AgentIdentityResolver  ---- trusted sub/client_id/actor/tenant/scopes
+                |
+                v
+  AuthorizationRequest (identity + action + resource + canonical arguments + context)
+                |
+                v
+     PolicyEngine  ---- DENY / ALLOW / APPROVAL_REQUIRED + policy/risk/trace evidence
+          |                                  |
+          |                                  v
+          |                         ApprovalService (bound SHA-256,
+          |                         expiry, atomic single use)
+          v                                  |
+  guarded method/tool execution <------------+
+                |
+                v
+       sanitized audit evidence
+```
+
+`AgentIdentityResolver` is the trust boundary. The built-in JWT claim mapper only
+accepts `VerifiedClaims`, which an upstream Keycloak, Entra, Spring Security,
+SPIFFE-JWT or custom verifier must produce after validating signature, issuer,
+audience and token lifetime. It maps `sub`, `client_id`, `actor`, `tenant`/`tid`,
+`scope`/`scp`, roles and `delegation_chain`. Request JSON and model tool arguments
+never supply effective agent IDs, roles or permissions.
+
+For plain Java use, no server is required:
+
+```java
+AgentGuard agentGuard = new AgentGuard(policyEngine, trustedIdentityResolver);
+AuthorizationDecision decision = agentGuard.authorize(request);
+```
+
+The resolver-backed facade replaces any identity carried by `request` with the
+current verified identity. The one-argument constructor remains available for
+trusted in-process requests that were already constructed from verified data.
+
+The optional `agentguard-spring-web` module exposes the same engine to other
+languages. Applications register `AgentGuardAuthorizationApi` and
+`AuthorizationController` with their trusted identity resolver. `principal` is
+only checked against that resolved identity; it never grants authority.
+
+```http
+POST /v1/authorize
+Content-Type: application/json
+
+{
+  "principal": "deploy-agent",
+  "action": "kubernetes.deploy",
+  "resource": {"type": "cluster", "id": "prod-a", "tags": {}},
+  "arguments": {"image": "orders:v2"},
+  "context": {"environment": "production", "traceId": "trace-123"}
+}
+```
+
+```json
+{
+  "decision": "APPROVAL_REQUIRED",
+  "reason": "Production deployment requires review",
+  "matchedPolicy": "cluster-governance",
+  "matchedRule": "prod-deploy-review",
+  "policyVersion": "2026-10",
+  "policyHash": "...",
+  "risk": "CRITICAL",
+  "approvalRequestId": "...",
+  "traceId": "trace-123"
+}
+```
+
+Spring AI callbacks can route approval-required calls directly into the approval
+module by using the `GuardedToolCallback` constructor that accepts an
+`ApprovalService` and TTL. The real callback stays blocked; its exception carries
+the bound approval request ID. MCP remains a small error adapter and is absent
+from the core engine.
+
+## Threat model
+
+AgentGuard is designed to stop forged payload identities, default-allow gaps,
+delegation privilege expansion, altered or replayed approvals, unreviewed tool
+execution and secret exposure through its standard audit publisher. It assumes
+the application protects policy files, uses a real token/workload-identity
+verifier, resolves resource facts such as production environment from trusted
+data, registers only guarded callbacks, and implements atomic approval storage
+for clustered deployments.
+
+It does not validate credentials itself, sandbox arbitrary code, detect prompt
+injection, make remote side effects exactly once, or sanitize logs outside the
+AgentGuard audit pipeline. OAuth/JWT proves who presented a valid credential;
+AgentGuard decides whether that verified identity may perform this exact action
+on this resource now, and records the decision evidence.
 
 ## Tests, policy checks, and benchmarks
 

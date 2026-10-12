@@ -28,9 +28,8 @@ class JsonAuditEventPublisherTest {
             String message = appender.list.getFirst().getFormattedMessage();
             assertThat(message).doesNotContain("dto-secret", "metadata-secret", "\n", "\r");
             var json = new ObjectMapper().readTree(message);
-            assertThat(json.path("parameters").path("payload").path("password").asText()).isEqualTo("[REDACTED]");
-            assertThat(json.path("parameters").path("payload").path("name").asText()).isEqualTo("line1\nline2");
-            assertThat(json.path("parameters").path("nullable").isNull()).isTrue();
+            assertThat(json.has("parameters")).isFalse();
+            assertThat(json.path("argumentsHash").asText()).hasSize(64);
             assertThat(json.path("metadata").path("token").asText()).isEqualTo("[REDACTED]");
         } finally { logger.detachAppender(appender); appender.stop(); }
     }

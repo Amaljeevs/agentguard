@@ -1,6 +1,7 @@
 version: "1.0"
 metadata:
   name: "enterprise-mcp-governance"
+  version: "2026-10"
   description: "Core access policy for developer and devops agents interacting with MCP server"
 
 roles:
@@ -49,6 +50,7 @@ rules:
   - id: "prod-deploy-approval"
     description: "Kubernetes deployment to production requires human sign-off"
     effect: APPROVAL_REQUIRED
+    risk: HIGH
     target:
       actions:
         - "kubernetes.deploy"

@@ -38,13 +38,14 @@ See the official [method security documentation](https://docs.spring.io/spring-s
 
 | Concern | Spring Security's role | AgentGuard's contribution |
 | --- | --- | --- |
-| Authentication | Validate credentials/tokens and establish a principal | Consume a trusted identity; never replace credential validation |
+| Authentication | Validate credentials/tokens and establish a principal | Map only verified claims into an immutable agent identity; never replace credential validation |
 | Endpoint/session security | Request authorization, CSRF, sessions, security context | Reuse those controls around HTTP/MCP endpoints |
 | Fine-grained authorization | Method security and extensible authorization managers | A shared agent/action/resource/environment model and declarative policy evaluator |
 | Tool invocation | Integrate application authorization with tool code | A Spring AI ToolCallback wrapper that checks immediately before execution |
-| Human approval | Build the workflow using application services | Explicit APPROVAL_REQUIRED plus request-bound, expiring, single-use approval primitives |
-| Delegation | Model the application's authority relationships | Check each request against the child and every parent resolved from a trusted registry |
-| Audit data | Authentication/authorization events and application logging | Structured parameter redaction, policy revision, correlation, and separate execution outcomes |
+| Human approval | Build the workflow using application services | Explicit APPROVAL_REQUIRED lifecycle plus cryptographically request-bound, expiring, single-use approval primitives |
+| Delegation | Model and authenticate authority relationships | Verify the full chain, enforce child authority as a subset and cap depth/expiry |
+| Audit data | Authentication/authorization events and application logging | Argument hashes, delegation, policy version/hash, risk, approval and trace evidence without raw arguments |
+| Cross-language clients | Secure the transport and authenticate callers | Optional `POST /v1/authorize` adapter over the same embeddable Java engine |
 
 AgentGuard does not invalidate or bypass Spring method security. Applications
 can use both. A method or tool must pass every applicable enforcement layer.
@@ -70,9 +71,11 @@ a release is published. See [CHANGELOG.md](CHANGELOG.md) for migration details.
 | Structured audit sanitization | Maps and lists, with null/DTO limitations | Nulls, maps, lists, arrays, records, bean getters, `@Sensitive`, cycle/depth limits |
 | Reusable JSON audit logger | Example-only implementation | Library publisher with sanitized parameters/metadata |
 | Execution outcome audit | Not provided | Authorization, success and failure events with correlation and policy revision |
-| Delegation | Identity metadata only | Per-request ancestor checks through `AgentIdentityLookup` |
+| Verified identity | Spring principal/name mapping | Extensible resolver plus verified JWT claim mapping for subject, client, actor, tenant, scopes and delegation |
+| Delegation | Identity metadata only | Full-chain verification, permission-subset enforcement, bounded depth and audit evidence |
 | Approval workflow primitives | Example-specific application workflow | Optional `agentguard-approval` module with atomic store SPI |
 | MCP integration | Exception-to-error mapping | Mapping plus optional Spring AI callback adapter and real MCP transport example |
+| Language-neutral API | Not provided | Optional `POST /v1/authorize` Spring MVC adapter |
 | Policy test CLI and benchmark harness | Not provided | Included |
 
 The core remains independent of Spring. Audit, approval, Spring, and Spring AI
@@ -146,13 +149,14 @@ are not current guarantees:
   interfaces, with tenant isolation, retention and operational controls.
 - External policy-engine adapters and safe policy rollout/version management.
 - OpenTelemetry exporters and integrations with existing audit retention systems.
-- Verified token/identity-provider integrations that preserve delegation and
-  revocation semantics across services.
+- Additional provider-specific adapters and revocation hooks for Keycloak,
+  Entra and SPIFFE deployments; the current verified-claims SPI is provider-neutral.
 - Broader framework/version compatibility, distributed execution scenarios and
   independent security review.
 
-There is no built-in risk-scoring model, prompt-injection detector, universal
-agent sandbox, or cross-language runtime. Preventing an unauthorized tool action
+There is no built-in dynamic risk-scoring model, prompt-injection detector,
+universal agent sandbox, or non-Java policy runtime. The HTTP API allows other
+languages to call the Java decision service. Preventing an unauthorized tool action
 does not prevent every malicious action an already authorized tool could perform.
 
 ## Try the evidence

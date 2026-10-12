@@ -6,6 +6,8 @@ import io.agentguard.core.engine.PolicyEngine;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.ToolCallbackProvider;
 import java.util.Arrays;
+import io.agentguard.approval.ApprovalService;
+import java.time.Duration;
 
 /** Registers only guarded callbacks, preserving tool schemas and metadata. */
 public final class GuardedToolCallbackProvider implements ToolCallbackProvider {
@@ -14,6 +16,13 @@ public final class GuardedToolCallbackProvider implements ToolCallbackProvider {
                                        PolicyEngine engine, AuditEventPublisher audit, ParameterSanitizer sanitizer) {
         callbacks = Arrays.stream(delegate.getToolCallbacks())
             .map(callback -> new GuardedToolCallback(callback, resolver, engine, audit, sanitizer)).toArray(ToolCallback[]::new);
+    }
+    public GuardedToolCallbackProvider(ToolCallbackProvider delegate, ToolAuthorizationResolver resolver,
+                                       PolicyEngine engine, AuditEventPublisher audit, ParameterSanitizer sanitizer,
+                                       ApprovalService approvals, Duration approvalTtl) {
+        callbacks = Arrays.stream(delegate.getToolCallbacks())
+            .map(callback -> new GuardedToolCallback(callback, resolver, engine, audit, sanitizer, approvals, approvalTtl))
+            .toArray(ToolCallback[]::new);
     }
     @Override public ToolCallback[] getToolCallbacks() { return callbacks.clone(); }
 }

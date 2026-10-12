@@ -11,6 +11,7 @@ import io.agentguard.core.model.PolicySet;
 import io.agentguard.core.model.Resource;
 import io.agentguard.core.model.RoleDefinition;
 import io.agentguard.core.model.RuleEffect;
+import io.agentguard.core.model.RiskLevel;
 import io.agentguard.core.identity.AgentIdentityLookup;
 
 import java.time.Instant;
@@ -18,6 +19,8 @@ import java.util.HashSet;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.List;
+import java.util.UUID;
 
 /**
  * Standard implementation of {@link PolicyEngine}.
@@ -37,6 +40,7 @@ public class DefaultPolicyEngine implements PolicyEngine {
     private final PermissionMatcher permissionMatcher;
     private final AgentIdentityLookup identities;
     private final String revision;
+    private final int maxDelegationDepth;
 
     public DefaultPolicyEngine(PolicySet policySet) {
         this(policySet, new DefaultPermissionMatcher());
@@ -47,9 +51,18 @@ public class DefaultPolicyEngine implements PolicyEngine {
     }
 
     public DefaultPolicyEngine(PolicySet policySet, PermissionMatcher permissionMatcher, AgentIdentityLookup identities) {
+        this(policySet, permissionMatcher, identities, 8);
+    }
+
+    public DefaultPolicyEngine(PolicySet policySet, PermissionMatcher permissionMatcher,
+                               AgentIdentityLookup identities, int maxDelegationDepth) {
         this.policySet = Objects.requireNonNull(policySet, "policySet must not be null");
         this.permissionMatcher = Objects.requireNonNull(permissionMatcher, "permissionMatcher must not be null");
         this.identities = Objects.requireNonNull(identities, "identities must not be null");
+        if (maxDelegationDepth < 0 || maxDelegationDepth > 64) {
+            throw new IllegalArgumentException("maxDelegationDepth must be between 0 and 64");
+        }
+        this.maxDelegationDepth = maxDelegationDepth;
         this.revision = PolicyRevision.of(policySet);
     }
 
@@ -59,32 +72,59 @@ public class DefaultPolicyEngine implements PolicyEngine {
     @Override
     public AuthorizationDecision evaluate(AuthorizationRequest request) {
         Objects.requireNonNull(request, "AuthorizationRequest must not be null");
-        return evaluateChain(request, new HashSet<>());
+        String traceId = traceId(request.context());
+        List<String> claimedChain = request.subject().delegationChain();
+        if (claimedChain.size() > maxDelegationDepth) {
+            return decision(Decision.DENY, "Invalid delegation: maximum depth exceeded", null,
+                RiskLevel.HIGH, traceId, request.context().timestamp());
+        }
+        return evaluateChain(request, new HashSet<>(), claimedChain, traceId);
     }
 
-    private AuthorizationDecision evaluateChain(AuthorizationRequest request, Set<String> visited) {
+    private AuthorizationDecision evaluateChain(AuthorizationRequest request, Set<String> visited,
+                                                List<String> expectedChain, String traceId) {
         AgentIdentity subject = request.subject();
-        AuthorizationDecision ownDecision = evaluateOwn(request);
+        AuthorizationDecision ownDecision = evaluateOwn(request, traceId);
         if (ownDecision.isDenied() || subject == null || subject.delegatedBy().isEmpty()) return ownDecision;
-        if (visited.size() >= 32 || !visited.add(subject.agentId())) {
-            return AuthorizationDecision.deny("Invalid delegation: cycle or depth limit exceeded");
+        if (visited.size() >= maxDelegationDepth || !visited.add(subject.agentId())) {
+            return decision(Decision.DENY, "Invalid delegation: cycle or depth limit exceeded", null,
+                RiskLevel.HIGH, traceId, request.context().timestamp());
         }
         String parentId = subject.delegatedBy().get();
+        if (expectedChain.isEmpty() || !expectedChain.getLast().equals(parentId)) {
+            return decision(Decision.DENY, "Invalid delegation: chain does not match immediate parent", null,
+                RiskLevel.HIGH, traceId, request.context().timestamp());
+        }
         Optional<AgentIdentity> parent;
         try { parent = identities.find(parentId); }
-        catch (RuntimeException failure) { return AuthorizationDecision.deny("Delegation parent lookup failed"); }
+        catch (RuntimeException failure) {
+            return decision(Decision.DENY, "Delegation parent lookup failed", null,
+                RiskLevel.HIGH, traceId, request.context().timestamp());
+        }
         if (parent == null || parent.isEmpty() || !parent.get().agentId().equals(parentId)) {
-            return AuthorizationDecision.deny("Delegation parent could not be verified");
+            return decision(Decision.DENY, "Delegation parent could not be verified", null,
+                RiskLevel.HIGH, traceId, request.context().timestamp());
         }
         if (subject.issuedAt().isBefore(parent.get().issuedAt()) || subject.expiresAt().isAfter(parent.get().expiresAt())) {
-            return AuthorizationDecision.deny("Delegated identity validity must be within its parent's validity");
+            return decision(Decision.DENY, "Delegated identity validity must be within its parent's validity", null,
+                RiskLevel.HIGH, traceId, request.context().timestamp());
         }
-        var parentDecision = evaluateChain(AuthorizationRequest.of(parent.get(), request.action(), request.resource(), request.context()), visited);
+        List<String> parentChain = expectedChain.subList(0, expectedChain.size() - 1);
+        if (!parent.get().delegationChain().equals(parentChain)) {
+            return decision(Decision.DENY, "Invalid delegation: verified ancestry does not match claimed chain", null,
+                RiskLevel.HIGH, traceId, request.context().timestamp());
+        }
+        if (!permissionsAreSubset(collectEffectivePermissions(subject), collectEffectivePermissions(parent.get()))) {
+            return decision(Decision.DENY, "Invalid delegation: child permissions exceed parent authority", null,
+                RiskLevel.CRITICAL, traceId, request.context().timestamp());
+        }
+        var parentDecision = evaluateChain(AuthorizationRequest.of(parent.get(), request.action(), request.resource(), request.context()),
+            visited, parentChain, traceId);
         if (parentDecision.isDenied() || parentDecision.isApprovalRequired()) return parentDecision;
         return ownDecision;
     }
 
-    private AuthorizationDecision evaluateOwn(AuthorizationRequest request) {
+    private AuthorizationDecision evaluateOwn(AuthorizationRequest request, String traceId) {
 
         AgentIdentity subject = request.subject();
         Action action = request.action();
@@ -93,25 +133,26 @@ public class DefaultPolicyEngine implements PolicyEngine {
 
         // 1. Identity validation & temporal boundary check
         if (subject == null) {
-            return AuthorizationDecision.deny("Denied: Subject agent identity is missing");
+            return decision(Decision.DENY, "Denied: Subject agent identity is missing", null,
+                RiskLevel.HIGH, traceId, context.timestamp());
         }
 
         Instant evalTime = context.timestamp() != null ? context.timestamp() : Instant.now();
         if (evalTime.isBefore(subject.issuedAt())) {
-            return AuthorizationDecision.deny("Denied: Agent identity is not yet valid");
+            return decision(Decision.DENY, "Denied: Agent identity is not yet valid", null,
+                RiskLevel.HIGH, traceId, evalTime);
         }
         if (subject.isExpired(evalTime)) {
-            return AuthorizationDecision.deny(
+            return decision(Decision.DENY,
                 String.format("Denied: Agent identity '%s' expired at %s (evaluated at %s)",
-                    subject.agentId(), subject.expiresAt(), evalTime)
-            );
+                    subject.agentId(), subject.expiresAt(), evalTime), null, RiskLevel.HIGH, traceId, evalTime);
         }
 
         // 2. Evaluate explicit DENY rules (Deny takes precedence over everything)
         for (PolicyRule rule : policySet.rules()) {
             if (rule.effect() == RuleEffect.DENY && matchesRule(rule, subject, action, resource, context)) {
                 String reason = rule.description().orElse("Denied by explicit rule: " + rule.id());
-                return AuthorizationDecision.deny(reason, policySet.name(), rule.id());
+                return decision(Decision.DENY, reason, rule, rule.risk(), traceId, evalTime);
             }
         }
 
@@ -120,7 +161,7 @@ public class DefaultPolicyEngine implements PolicyEngine {
         for (PolicyRule rule : policySet.rules()) {
             if (rule.effect() == RuleEffect.ALLOW && matchesRule(rule, subject, action, resource, context)) {
                 String reason = rule.description().orElse("Permitted by rule: " + rule.id());
-                grant = AuthorizationDecision.allow(reason, policySet.name(), rule.id());
+                grant = decision(Decision.ALLOW, reason, rule, rule.risk(), traceId, evalTime);
                 break;
             }
         }
@@ -129,10 +170,9 @@ public class DefaultPolicyEngine implements PolicyEngine {
         Set<String> effectivePermissions = collectEffectivePermissions(subject);
         for (String grantedPattern : effectivePermissions.stream().sorted().toList()) {
             if (permissionMatcher.matches(grantedPattern, action.name())) {
-                if (grant == null) grant = AuthorizationDecision.allow(
+                if (grant == null) grant = decision(Decision.ALLOW,
                     String.format("Permitted by role/identity permission pattern '%s'", grantedPattern),
-                    policySet.name()
-                );
+                    null, RiskLevel.LOW, traceId, evalTime);
                 break;
             }
         }
@@ -140,17 +180,17 @@ public class DefaultPolicyEngine implements PolicyEngine {
         if (grant != null) {
             for (PolicyRule rule : policySet.rules()) {
                 if (rule.effect() == RuleEffect.APPROVAL_REQUIRED && matchesRule(rule, subject, action, resource, context)) {
-                    return AuthorizationDecision.requireApproval(rule.description().orElse("Action requires approval: " + rule.id()),
-                        policySet.name(), rule.id());
+                    return decision(Decision.APPROVAL_REQUIRED,
+                        rule.description().orElse("Action requires approval: " + rule.id()),
+                        rule, rule.risk(), traceId, evalTime);
                 }
             }
             return grant;
         }
         // Deny by default
-        return AuthorizationDecision.deny(
+        return decision(Decision.DENY,
             String.format("Access denied: No matching permission or policy rule permits action '%s' for agent '%s'",
-                action.name(), subject.agentId())
-        );
+                action.name(), subject.agentId()), null, RiskLevel.MEDIUM, traceId, evalTime);
     }
 
     private boolean matchesRule(
@@ -213,6 +253,36 @@ public class DefaultPolicyEngine implements PolicyEngine {
         }
 
         return permissions;
+    }
+
+    private boolean permissionsAreSubset(Set<String> child, Set<String> parent) {
+        return child.stream().allMatch(childPermission -> parent.stream()
+            .anyMatch(parentPermission -> permissionCovers(parentPermission, childPermission)));
+    }
+
+    /** Conservative wildcard containment: ambiguous patterns deny rather than widening authority. */
+    private boolean permissionCovers(String parent, String child) {
+        if (Objects.equals(parent, child) || "*".equals(parent)) return true;
+        if (!child.contains("*")) return permissionMatcher.matches(parent, child);
+        if (parent.endsWith("*") && parent.indexOf('*') == parent.length() - 1) {
+            return child.startsWith(parent.substring(0, parent.length() - 1));
+        }
+        if (parent.startsWith("*") && parent.lastIndexOf('*') == 0) {
+            return child.endsWith(parent.substring(1));
+        }
+        return false;
+    }
+
+    private AuthorizationDecision decision(Decision effect, String reason, PolicyRule rule, RiskLevel risk,
+                                           String traceId, Instant evaluatedAt) {
+        return AuthorizationDecision.detailed(effect, reason, policySet.policyId(), rule == null ? null : rule.id(),
+            policySet.version(), revision, risk, traceId, evaluatedAt);
+    }
+
+    private static String traceId(AuthorizationContext context) {
+        Object supplied = context.metadata().get("traceId");
+        if (supplied instanceof String trace && !trace.isBlank() && trace.length() <= 128) return trace;
+        return UUID.randomUUID().toString();
     }
 
     public PolicySet getPolicySet() {

@@ -9,8 +9,10 @@
 - Approval-required rules require an underlying role/identity permission or
   explicit ALLOW rule. Approval never creates permission.
 - Delegated requests require an `AgentIdentityLookup` backed by trusted data.
-  The child and every parent must authorize the request. Unknown parents,
-  cycles, excessive depth, and child validity outside parent validity deny.
+  The child and every parent must authorize the request, the full claimed chain
+  must match trusted lookup data, and child permissions must remain a subset of
+  parent authority. Unknown parents, cycles, excessive depth, and child validity
+  outside parent validity deny.
 - Identity expiration is exclusive: an identity is expired at `expiresAt`.
   Identities cannot be used before `issuedAt`.
 - Structured sanitization supports nulls, arrays, records, bean getters,
@@ -26,6 +28,14 @@
 - `agentguard-approval`: request binding, expiration, separate approver permission,
   rejection, immutable execution snapshots and atomic single-use consumption.
 - `agentguard-spring-ai`: guarded ToolCallback/ToolCallbackProvider adapters.
+- Verified-claims identity mapping for JWT `sub`, `client_id`, `actor`/`act`,
+  tenant, scopes, roles and delegation chain, with Spring Security JWT support.
+- Policy IDs/versions/content hashes, risk and trace metadata on decisions;
+  deterministic results when callers supply a fixed trusted timestamp and trace.
+- Approval tickets expose action/resource/arguments hashes and lifecycle states
+  `APPROVAL_REQUIRED`, `APPROVED`, `DENIED`, `EXPIRED` and `CONSUMED`.
+- `agentguard-spring-web`: optional language-neutral `POST /v1/authorize` adapter.
+- `AgentGuard.authorize(request)` facade and concise `resource` annotation alias.
 - A real Streamable HTTP MCP/H2 example with authenticated identity propagation,
   reusable approvals, executable client walkthrough, and network integration tests.
 - Declarative policy test CLI, JMH benchmark harness, consumer CI jobs, and
@@ -37,6 +47,8 @@
 - Fix invalid SpEL expressions; use `#p0`/`#a0` aliases if parameter names are not retained.
 - Add explicit permissions for actions subject to approval.
 - Register a trusted delegation lookup, or stop supplying unverified `delegatedBy` values.
+- Resolve identity from trusted authentication context. Do not deserialize roles,
+  permissions or delegation authority from authorization request payloads.
 - Expect AUTHORIZATION plus EXECUTION_SUCCEEDED/EXECUTION_FAILED audit records for
   allowed calls. Update event-count assertions and downstream audit consumers.
 - Set `agentguard.audit.failure-mode=BEST_EFFORT` only if continuing without a

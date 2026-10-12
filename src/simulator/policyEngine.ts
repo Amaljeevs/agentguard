@@ -1,5 +1,6 @@
 export type AgentType = 'ASSISTANT' | 'AUTONOMOUS' | 'WORKER' | 'SYSTEM';
 export type DecisionType = 'ALLOW' | 'DENY' | 'APPROVAL_REQUIRED';
+export type RiskLevel = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 
 export interface AgentIdentity {
   agentId: string;
@@ -7,6 +8,7 @@ export interface AgentIdentity {
   roles: string[];
   permissions: string[];
   delegatedBy?: string;
+  delegationChain?: string[];
   sessionId?: string;
   issuedAt: string;
   expiresAt: string;
@@ -49,6 +51,9 @@ export interface AuthorizationDecision {
   matchedPolicyName?: string;
   matchedRuleId?: string;
   evaluatedAt: string;
+  policyVersion?: string;
+  risk: RiskLevel;
+  traceId: string;
   trace: EvaluationTraceStep[];
 }
 
@@ -80,6 +85,7 @@ export interface PolicyRuleDef {
   id: string;
   description?: string;
   effect: DecisionType;
+  risk?: RiskLevel;
   targetRoles?: string[];
   targetActions?: string[];
   resourceType?: string;
@@ -129,6 +135,7 @@ export const DEFAULT_POLICY: PolicySetDef = {
       id: 'prod-deploy-approval',
       description: 'Deploying to Kubernetes in production requires human approval',
       effect: 'APPROVAL_REQUIRED',
+      risk: 'HIGH',
       targetActions: ['kubernetes.deploy'],
       environments: ['production'],
     },
@@ -148,10 +155,14 @@ export function evaluatePolicy(
 ): AuthorizationDecision {
   const trace: EvaluationTraceStep[] = [];
   const now = new Date(req.context.timestamp).getTime();
+  const issuedAt = new Date(req.subject.issuedAt).getTime();
   const expiresAt = new Date(req.subject.expiresAt).getTime();
+  const traceId = typeof req.context.metadata?.traceId === 'string'
+    ? req.context.metadata.traceId : crypto.randomUUID();
+  const evaluatedAt = req.context.timestamp;
 
   // Step 1: Expiration check
-  if (now > expiresAt) {
+  if (!Number.isFinite(now) || now < issuedAt || now >= expiresAt) {
     trace.push({
       step: 'Identity Validity Check',
       status: 'failed',
@@ -160,7 +171,7 @@ export function evaluatePolicy(
     return {
       decision: 'DENY',
       reason: `Denied: Agent identity '${req.subject.agentId}' expired`,
-      evaluatedAt: new Date().toISOString(),
+      evaluatedAt, risk: 'HIGH', traceId,
       trace,
     };
   }
@@ -184,7 +195,7 @@ export function evaluatePolicy(
         reason: rule.description || `Denied by explicit rule: ${rule.id}`,
         matchedPolicyName: policy.name,
         matchedRuleId: rule.id,
-        evaluatedAt: new Date().toISOString(),
+        evaluatedAt, policyVersion: policy.version, risk: rule.risk || 'MEDIUM', traceId,
         trace,
       };
     }
@@ -196,51 +207,17 @@ export function evaluatePolicy(
     details: 'No explicit DENY rules matched the request context.',
   });
 
-  // Step 3: APPROVAL_REQUIRED rules
-  for (const rule of policy.rules) {
-    if (rule.effect === 'APPROVAL_REQUIRED' && ruleMatches(rule, req)) {
-      trace.push({
-        step: `Evaluate Approval Rule: ${rule.id}`,
-        status: 'triggered',
-        details: rule.description || `Action requires human/quorum approval: ${rule.id}`,
-      });
-      return {
-        decision: 'APPROVAL_REQUIRED',
-        reason: rule.description || `Action requires human approval: ${rule.id}`,
-        matchedPolicyName: policy.name,
-        matchedRuleId: rule.id,
-        evaluatedAt: new Date().toISOString(),
-        trace,
-      };
-    }
-  }
-
-  trace.push({
-    step: 'Approval Rules Evaluation',
-    status: 'passed',
-    details: 'No APPROVAL_REQUIRED conditions triggered.',
-  });
-
-  // Step 4: Explicit ALLOW rules
+  // Establish an underlying grant before approval can restrict it.
+  let grantReason: string | undefined;
+  let grantRule: PolicyRuleDef | undefined;
   for (const rule of policy.rules) {
     if (rule.effect === 'ALLOW' && ruleMatches(rule, req)) {
-      trace.push({
-        step: `Evaluate Allow Rule: ${rule.id}`,
-        status: 'triggered',
-        details: rule.description || `Permitted by explicit rule: ${rule.id}`,
-      });
-      return {
-        decision: 'ALLOW',
-        reason: rule.description || `Permitted by rule: ${rule.id}`,
-        matchedPolicyName: policy.name,
-        matchedRuleId: rule.id,
-        evaluatedAt: new Date().toISOString(),
-        trace,
-      };
+      grantReason = rule.description || `Permitted by rule: ${rule.id}`;
+      grantRule = rule;
+      break;
     }
   }
 
-  // Step 5: RBAC Role & Permission evaluation
   const effectivePermissions = new Set<string>(req.subject.permissions || []);
   for (const roleName of req.subject.roles) {
     const roleDef = policy.roles[roleName];
@@ -257,35 +234,44 @@ export function evaluatePolicy(
     }
   }
 
-  if (matchedPattern) {
+  if (!grantReason && matchedPattern) {
+    grantReason = `Permitted by permission pattern '${matchedPattern}'`;
     trace.push({
       step: 'RBAC Permission Match',
       status: 'passed',
       details: `Action '${req.action.name}' matches granted permission pattern '${matchedPattern}' via roles [${req.subject.roles.join(', ')}]`,
     });
+  }
+
+  if (!grantReason) {
+    trace.push({
+      step: 'Deny By Default Resolution',
+      status: 'failed',
+      details: `No permission pattern in [${Array.from(effectivePermissions).join(', ')}] satisfies action '${req.action.name}'`,
+    });
+
     return {
-      decision: 'ALLOW',
-      reason: `Permitted by permission pattern '${matchedPattern}'`,
+      decision: 'DENY',
+      reason: `Access denied: No matching permission or policy rule permits action '${req.action.name}' for agent '${req.subject.agentId}'`,
       matchedPolicyName: policy.name,
-      evaluatedAt: new Date().toISOString(),
+      evaluatedAt, policyVersion: policy.version, risk: 'MEDIUM', traceId,
       trace,
     };
   }
 
-  // Step 6: Deny by default
-  trace.push({
-    step: 'Deny By Default Resolution',
-    status: 'failed',
-    details: `No permission pattern in [${Array.from(effectivePermissions).join(', ')}] satisfies action '${req.action.name}'`,
-  });
+  for (const rule of policy.rules) {
+    if (rule.effect === 'APPROVAL_REQUIRED' && ruleMatches(rule, req)) {
+      trace.push({ step: `Evaluate Approval Rule: ${rule.id}`, status: 'triggered',
+        details: rule.description || `Action requires human approval: ${rule.id}` });
+      return { decision: 'APPROVAL_REQUIRED', reason: rule.description || `Action requires human approval: ${rule.id}`,
+        matchedPolicyName: policy.name, matchedRuleId: rule.id, evaluatedAt,
+        policyVersion: policy.version, risk: rule.risk || 'HIGH', traceId, trace };
+    }
+  }
 
-  return {
-    decision: 'DENY',
-    reason: `Access denied: No matching permission or policy rule permits action '${req.action.name}' for agent '${req.subject.agentId}'`,
-    matchedPolicyName: policy.name,
-    evaluatedAt: new Date().toISOString(),
-    trace,
-  };
+  return { decision: 'ALLOW', reason: grantReason, matchedPolicyName: policy.name,
+    matchedRuleId: grantRule?.id, evaluatedAt, policyVersion: policy.version,
+    risk: grantRule?.risk || 'LOW', traceId, trace };
 }
 
 function ruleMatches(rule: PolicyRuleDef, req: AuthorizationRequest): boolean {

@@ -90,7 +90,9 @@ public class AgentAuthorizationAspect {
 
         // 4. Resolve SpEL for resourceId & environment
         EvaluationContext evalContext = createEvaluationContext(method, args);
-        String resourceId = resolveSpel(agentAuthorize.resourceId(), evalContext, "default-resource");
+        String resourceExpression = !agentAuthorize.resourceId().isBlank()
+            ? agentAuthorize.resourceId() : agentAuthorize.resource();
+        String resourceId = resolveSpel(resourceExpression, evalContext, "default-resource");
         String resourceType = !agentAuthorize.resourceType().isBlank() ? agentAuthorize.resourceType() : "tool";
         String environment = resolveSpel(agentAuthorize.environment(), evalContext, defaultEnvironment);
 

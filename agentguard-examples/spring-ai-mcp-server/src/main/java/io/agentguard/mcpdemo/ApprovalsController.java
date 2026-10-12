@@ -1,14 +1,11 @@
 package io.agentguard.mcpdemo;
 
 import io.agentguard.approval.*;
-import io.agentguard.audit.publisher.AuditEventPublisher;
-import io.agentguard.audit.sanitizer.ParameterSanitizer;
-import io.agentguard.core.engine.PolicyEngine;
 import io.agentguard.core.exception.AgentAccessDeniedException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.security.Principal;
-import java.time.*;
+import java.time.Duration;
 import java.util.Map;
 
 @RestController
@@ -17,8 +14,8 @@ public class ApprovalsController {
     private final ApprovalService approvals;
     private final TrustedAgents agents;
     private final OrderTools tools;
-    public ApprovalsController(PolicyEngine engine, AuditEventPublisher audit, ParameterSanitizer sanitizer, TrustedAgents agents, OrderTools tools) {
-        this.approvals = new ApprovalService(engine, new InMemoryApprovalStore(), Clock.systemUTC(), audit, sanitizer);
+    public ApprovalsController(ApprovalService approvals, TrustedAgents agents, OrderTools tools) {
+        this.approvals = approvals;
         this.agents = agents; this.tools = tools;
     }
     @PostMapping(path="/request", consumes="application/json")

@@ -60,4 +60,29 @@ class PolicyHardeningTest {
         var b = PolicySet.builder("test", "1.0").roles(Map.of("role", RoleDefinition.of("role", new LinkedHashSet<>(List.of("b", "a"))))).build();
         assertThat(PolicyRevision.of(a)).isEqualTo(PolicyRevision.of(b)).isNotEqualTo(PolicyRevision.of(policy()));
     }
+    @Test void childCannotHoldAnyPermissionOutsideParentAuthority() {
+        var parent = identity("parent", null, "orders.*");
+        var child = AgentIdentity.builder().agentId("child").delegatedBy("parent")
+            .permissions(Set.of("orders.refund", "secrets.read"))
+            .issuedAt(now.minusSeconds(60)).expiresAt(now.plusSeconds(60)).build();
+        var engine = new DefaultPolicyEngine(policy(), new DefaultPermissionMatcher(), id -> Optional.of(parent));
+        assertThat(engine.evaluate(request(child)).reason()).contains("exceed parent authority");
+    }
+    @Test void configuredDelegationDepthAndClaimedAncestryAreEnforced() {
+        var parent = identity("parent", null, "orders.*");
+        var child = AgentIdentity.builder().agentId("child").permission("orders.refund")
+            .delegationChain(List.of("root", "parent"))
+            .issuedAt(now.minusSeconds(60)).expiresAt(now.plusSeconds(60)).build();
+        var engine = new DefaultPolicyEngine(policy(), new DefaultPermissionMatcher(), id -> Optional.of(parent), 1);
+        assertThat(engine.evaluate(request(child)).reason()).contains("maximum depth");
+    }
+    @Test void decisionsAreDeterministicWhenTimestampAndTraceAreSupplied() {
+        var context = new AuthorizationContext("production", now, Map.of("traceId", "trace-fixed"));
+        var request = AuthorizationRequest.of(identity("agent", null, "orders.refund"), Action.of("orders.refund"),
+            Resource.of("order", "1"), context);
+        var engine = new DefaultPolicyEngine(policy());
+        assertThat(engine.evaluate(request)).isEqualTo(engine.evaluate(request));
+        assertThat(engine.evaluate(request).policyHash()).contains(engine.revision());
+        assertThat(engine.evaluate(request).riskLevel()).isEqualTo(RiskLevel.HIGH);
+    }
 }

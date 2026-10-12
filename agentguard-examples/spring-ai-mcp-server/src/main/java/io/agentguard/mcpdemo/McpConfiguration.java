@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.agentguard.audit.publisher.*;
 import io.agentguard.audit.sanitizer.ParameterSanitizer;
+import io.agentguard.approval.*;
 import io.agentguard.core.engine.PolicyEngine;
 import io.agentguard.core.model.AgentIdentity;
 import io.agentguard.spring.ai.GuardedToolCallback;
@@ -17,6 +18,7 @@ import org.springframework.ai.tool.definition.ToolDefinition;
 import org.springframework.context.annotation.*;
 import org.springframework.web.servlet.function.*;
 import java.util.*;
+import java.time.*;
 
 @Configuration(proxyBeanMethods = false)
 public class McpConfiguration {
@@ -32,8 +34,14 @@ public class McpConfiguration {
     @Bean @Primary AuditEventPublisher auditPublisher(InMemoryAuditEventPublisher events, ParameterSanitizer sanitizer) {
         return new CompositeAuditEventPublisher(List.of(events, new JsonAuditEventPublisher(sanitizer)), AuditFailureMode.FAIL_CLOSED);
     }
+    @Bean InMemoryApprovalStore approvalStore() { return new InMemoryApprovalStore(); }
+    @Bean ApprovalService approvalService(PolicyEngine engine, InMemoryApprovalStore store,
+            AuditEventPublisher audit, ParameterSanitizer sanitizer) {
+        return new ApprovalService(engine, store, Clock.systemUTC(), audit, sanitizer);
+    }
     @Bean(destroyMethod="close") McpSyncServer mcpServer(WebMvcStreamableServerTransportProvider transport,
-            OrderTools orders, PolicyEngine engine, AuditEventPublisher audit, ParameterSanitizer sanitizer, ObjectMapper json) {
+            OrderTools orders, PolicyEngine engine, AuditEventPublisher audit, ParameterSanitizer sanitizer,
+            ApprovalService approvals, ObjectMapper json) {
         List<ToolCallback> callbacks = new ArrayList<>();
         for (String name : List.of("readOrder", "refundOrder")) {
             ToolCallback operation = new ToolCallback() {
@@ -48,7 +56,7 @@ public class McpConfiguration {
                 var exchange = McpToolUtils.getMcpExchange(context).orElseThrow();
                 var identity = (AgentIdentity) exchange.transportContext().get("agentguard.identity");
                 return orders.request(tool, arguments, identity);
-            }, engine, audit, sanitizer));
+            }, engine, audit, sanitizer, approvals, Duration.ofMinutes(5)));
         }
         return McpServer.sync(transport).serverInfo("agentguard-orders", "0.2.0")
             .capabilities(McpSchema.ServerCapabilities.builder().tools(true).build())

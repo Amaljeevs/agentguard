@@ -31,8 +31,10 @@ public final class PolicyTestCli {
                 var result = engine.evaluate(request);
                 boolean passed = result.decision() == scenario.expected();
                 if (!passed) failures++;
-                output.printf("%s %s: %s; rule=%s; %s%n", passed ? "PASS" : "FAIL", scenario.name(), result.decision(),
-                    result.matchedRuleId().orElse("none"), result.reason());
+                output.printf("%s %s: %s; policy=%s@%s; rule=%s; risk=%s; trace=%s; %s%n",
+                    passed ? "PASS" : "FAIL", scenario.name(), result.decision(),
+                    result.matchedPolicyId().orElse("none"), result.policyVersion().orElse("none"),
+                    result.matchedRuleId().orElse("none"), result.riskLevel(), result.traceId(), result.reason());
             }
             return failures == 0 ? 0 : 1;
         } catch (Exception failure) { output.println("Invalid policy test input: " + failure.getClass().getSimpleName()); return 2; }

@@ -57,7 +57,7 @@ public record AgentIdentity(
 
     public boolean isExpired(Instant now) {
         Objects.requireNonNull(now, "Reference instant must not be null");
-        return now.isAfter(expiresAt);
+        return !now.isBefore(expiresAt);
     }
 
     public static Builder builder() {
@@ -73,73 +73,44 @@ public record AgentIdentity(
     description: 'Stateless, deterministic Policy Decision Point (PDP) enforcing fail-closed checks, explicit deny precedence, and RBAC wildcards.',
     content: `package io.agentguard.core.engine;
 
+import io.agentguard.core.identity.AgentIdentityLookup;
 import io.agentguard.core.model.*;
-import java.time.Instant;
 import java.util.*;
 
 public class DefaultPolicyEngine implements PolicyEngine {
-
     private final PolicySet policySet;
-    private final PermissionMatcher permissionMatcher;
-
-    public DefaultPolicyEngine(PolicySet policySet) {
-        this(policySet, new DefaultPermissionMatcher());
-    }
-
-    public DefaultPolicyEngine(PolicySet policySet, PermissionMatcher permissionMatcher) {
-        this.policySet = Objects.requireNonNull(policySet);
-        this.permissionMatcher = Objects.requireNonNull(permissionMatcher);
-    }
+    private final AgentIdentityLookup identities;
+    private final int maxDelegationDepth;
+    private final String revision;
 
     @Override
     public AuthorizationDecision evaluate(AuthorizationRequest request) {
-        AgentIdentity subject = request.subject();
-        Action action = request.action();
-        Resource resource = request.resource();
-        AuthorizationContext context = request.context();
+        // Trace IDs come from trusted context when supplied; policy output includes
+        // policy ID/version/hash, risk, reason, matched rule and evaluation time.
+        String traceId = resolveTraceId(request.context());
 
-        // 1. Identity validity & temporal check
-        if (subject == null) {
-            return AuthorizationDecision.deny("Denied: Subject agent identity is missing");
-        }
-        Instant evalTime = context.timestamp() != null ? context.timestamp() : Instant.now();
-        if (subject.isExpired(evalTime)) {
-            return AuthorizationDecision.deny(
-                String.format("Denied: Agent identity '%s' expired at %s", subject.agentId(), subject.expiresAt())
-            );
-        }
+        // Fail closed for invalid identity time, malformed/unverified ancestry,
+        // excessive depth, cycles or child permissions outside parent authority.
+        AuthorizationDecision own = evaluateOwn(request, traceId);
+        if (own.isDenied()) return own;
+        AuthorizationDecision ancestors = evaluateVerifiedAncestors(request, traceId);
+        return ancestors.isAllowed() ? own : ancestors;
+    }
 
-        // 2. Explicit DENY rules (Deny takes precedence)
-        for (PolicyRule rule : policySet.rules()) {
-            if (rule.effect() == RuleEffect.DENY && matchesRule(rule, subject, action, resource, context)) {
-                return AuthorizationDecision.deny(rule.description().orElse("Denied by explicit rule"), policySet.name(), rule.id());
-            }
-        }
+    private AuthorizationDecision evaluateOwn(AuthorizationRequest request, String traceId) {
+        // 1. Validate issuedAt <= evaluationTime < expiresAt.
+        // 2. A matching DENY rule wins.
+        // 3. Establish an ALLOW rule or effective role/direct permission.
+        // 4. Apply APPROVAL_REQUIRED only as a restriction on that grant.
+        // 5. Otherwise deny by default.
+        ...
+    }
 
-        // 3. APPROVAL_REQUIRED rules
-        for (PolicyRule rule : policySet.rules()) {
-            if (rule.effect() == RuleEffect.APPROVAL_REQUIRED && matchesRule(rule, subject, action, resource, context)) {
-                return AuthorizationDecision.requireApproval(rule.description().orElse("Action requires approval"), policySet.name(), rule.id());
-            }
-        }
-
-        // 4. Explicit ALLOW rules
-        for (PolicyRule rule : policySet.rules()) {
-            if (rule.effect() == RuleEffect.ALLOW && matchesRule(rule, subject, action, resource, context)) {
-                return AuthorizationDecision.allow(rule.description().orElse("Permitted by rule"), policySet.name(), rule.id());
-            }
-        }
-
-        // 5. Evaluate RBAC Permissions with wildcards
-        Set<String> effectivePermissions = collectEffectivePermissions(subject);
-        for (String grantedPattern : effectivePermissions) {
-            if (permissionMatcher.matches(grantedPattern, action.name())) {
-                return AuthorizationDecision.allow("Permitted by role permission pattern '" + grantedPattern + "'", policySet.name());
-            }
-        }
-
-        // 6. Deny by default
-        return AuthorizationDecision.deny("Access denied: No matching permission or policy rule permits action '" + action.name() + "'");
+    private AuthorizationDecision evaluateVerifiedAncestors(
+            AuthorizationRequest request, String traceId) {
+        // Resolve every parent through AgentIdentityLookup. Verify the complete
+        // root-to-parent chain, validity containment and child-permission subset.
+        ...
     }
 }`
   },

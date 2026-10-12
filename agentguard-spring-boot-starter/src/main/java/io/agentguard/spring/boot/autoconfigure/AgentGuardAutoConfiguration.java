@@ -14,6 +14,7 @@ import io.agentguard.core.identity.AgentIdentityLookup;
 import io.agentguard.audit.publisher.JsonAuditEventPublisher;
 import io.agentguard.audit.publisher.ReliableAuditEventPublisher;
 import io.agentguard.core.model.PolicySet;
+import io.agentguard.core.AgentGuard;
 import io.agentguard.policy.loader.PolicyLoader;
 import io.agentguard.policy.loader.YamlPolicyLoader;
 import io.agentguard.spring.aop.AgentAuthorizationAspect;
@@ -76,8 +77,14 @@ public class AgentGuardAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    public PolicyEngine agentGuardPolicyEngine(PolicySet policySet, PermissionMatcher permissionMatcher, AgentIdentityLookup identities) {
-        return new DefaultPolicyEngine(policySet, permissionMatcher, identities);
+    public PolicyEngine agentGuardPolicyEngine(PolicySet policySet, PermissionMatcher permissionMatcher,
+                                                AgentIdentityLookup identities, AgentGuardProperties properties) {
+        return new DefaultPolicyEngine(policySet, permissionMatcher, identities, properties.getMaxDelegationDepth());
+    }
+
+    @Bean @ConditionalOnMissingBean
+    public AgentGuard agentGuard(PolicyEngine policyEngine, AgentIdentityResolver identities) {
+        return new AgentGuard(policyEngine, identities);
     }
 
     @Bean

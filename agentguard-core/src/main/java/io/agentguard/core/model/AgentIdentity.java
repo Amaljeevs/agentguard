@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.List;
 
 /**
  * Language-neutral security principal representing an AI agent.
@@ -25,6 +26,8 @@ public record AgentIdentity(
     Instant expiresAt,
     Map<String, Object> attributes
 ) {
+    public static final String DELEGATION_CHAIN_ATTRIBUTE = "agentguard.delegationChain";
+    public static final String TENANT_ATTRIBUTE = "tenant";
     public AgentIdentity {
         Objects.requireNonNull(agentId, "agentId must not be null");
         Objects.requireNonNull(agentType, "agentType must not be null");
@@ -40,6 +43,15 @@ public record AgentIdentity(
         delegatedBy = delegatedBy == null ? Optional.empty() : delegatedBy;
         sessionId = sessionId == null ? Optional.empty() : sessionId;
         attributes = attributes == null ? Map.of() : Map.copyOf(attributes);
+        Object chainValue = attributes.get(DELEGATION_CHAIN_ATTRIBUTE);
+        if (chainValue != null) {
+            if (!(chainValue instanceof List<?> chain) || chain.stream().anyMatch(item -> !(item instanceof String text) || text.isBlank())) {
+                throw new IllegalArgumentException("delegation chain must be a list of non-blank strings");
+            }
+            List<String> ids = chain.stream().map(String.class::cast).toList();
+            if (new HashSet<>(ids).size() != ids.size()) throw new IllegalArgumentException("delegation chain contains a cycle");
+            if (!ids.isEmpty()) delegatedBy = Optional.of(ids.getLast());
+        }
     }
 
     /**
@@ -48,6 +60,20 @@ public record AgentIdentity(
     public boolean isExpired(Instant now) {
         Objects.requireNonNull(now, "Reference instant must not be null");
         return !now.isBefore(expiresAt);
+    }
+
+    /** Verified ancestor IDs ordered from root authority to immediate delegator. */
+    public List<String> delegationChain() {
+        Object value = attributes.get(DELEGATION_CHAIN_ATTRIBUTE);
+        if (value instanceof List<?> list) {
+            return list.stream().map(String.class::cast).toList();
+        }
+        return delegatedBy.map(List::of).orElseGet(List::of);
+    }
+
+    public Optional<String> tenantId() {
+        Object value = attributes.get(TENANT_ATTRIBUTE);
+        return value instanceof String tenant && !tenant.isBlank() ? Optional.of(tenant) : Optional.empty();
     }
 
     public static Builder builder() {
@@ -105,6 +131,28 @@ public record AgentIdentity(
 
         public Builder delegatedBy(String delegatedBy) {
             this.delegatedBy = delegatedBy;
+            return this;
+        }
+
+        public Builder delegationChain(List<String> chain) {
+            if (chain == null || chain.isEmpty()) {
+                attributes.remove(DELEGATION_CHAIN_ATTRIBUTE);
+                delegatedBy = null;
+                return this;
+            }
+            List<String> copy = chain.stream()
+                .map(value -> Objects.requireNonNull(value, "delegation chain entry"))
+                .map(String::trim).toList();
+            if (copy.stream().anyMatch(String::isBlank) || new HashSet<>(copy).size() != copy.size()) {
+                throw new IllegalArgumentException("delegation chain must contain unique non-blank IDs");
+            }
+            attributes.put(DELEGATION_CHAIN_ATTRIBUTE, copy);
+            delegatedBy = copy.getLast();
+            return this;
+        }
+
+        public Builder tenantId(String tenantId) {
+            if (tenantId != null && !tenantId.isBlank()) attributes.put(TENANT_ATTRIBUTE, tenantId);
             return this;
         }
 

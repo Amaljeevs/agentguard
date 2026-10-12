@@ -15,6 +15,7 @@
       "type": "object",
       "properties": {
         "name": { "type": "string" },
+        "version": { "type": "string", "minLength": 1 },
         "description": { "type": "string" },
         "author": { "type": "string" }
       },
@@ -55,6 +56,10 @@
           "effect": {
             "type": "string",
             "enum": ["ALLOW", "DENY", "APPROVAL_REQUIRED"]
+          },
+          "risk": {
+            "type": "string",
+            "enum": ["LOW", "MEDIUM", "HIGH", "CRITICAL"]
           },
           "target": {
             "type": "object",

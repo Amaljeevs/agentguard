@@ -16,6 +16,9 @@ import org.springframework.ai.tool.definition.ToolDefinition;
 import org.springframework.ai.tool.metadata.ToolMetadata;
 import java.util.Map;
 import java.util.Objects;
+import io.agentguard.approval.ApprovalService;
+import java.time.Duration;
+import java.util.Optional;
 
 /** Wrap every callback exposed to the model/server. No proxy or annotation self-invocation dependency. */
 public final class GuardedToolCallback implements ToolCallback {
@@ -30,6 +33,15 @@ public final class GuardedToolCallback implements ToolCallback {
                                AuditEventPublisher audit, ParameterSanitizer sanitizer) {
         this.delegate = Objects.requireNonNull(delegate); this.resolver = Objects.requireNonNull(resolver);
         this.executor = new AuthorizationExecutor(engine, audit, sanitizer);
+    }
+    /** Routes approval-required tool calls into the reusable approval module before blocking execution. */
+    public GuardedToolCallback(ToolCallback delegate, ToolAuthorizationResolver resolver, PolicyEngine engine,
+                               AuditEventPublisher audit, ParameterSanitizer sanitizer,
+                               ApprovalService approvals, Duration approvalTtl) {
+        this.delegate = Objects.requireNonNull(delegate); this.resolver = Objects.requireNonNull(resolver);
+        Objects.requireNonNull(approvals); Objects.requireNonNull(approvalTtl);
+        this.executor = new AuthorizationExecutor(engine, audit, sanitizer,
+            (request, decision) -> Optional.of(approvals.request(request, approvalTtl).id()));
     }
     @Override public ToolDefinition getToolDefinition() { return delegate.getToolDefinition(); }
     @Override public ToolMetadata getToolMetadata() { return delegate.getToolMetadata(); }

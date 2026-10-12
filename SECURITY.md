@@ -45,8 +45,9 @@ code outside its guarded execution path.
 - A delegated request is evaluated for each ancestor returned by a trusted
   AgentIdentityLookup. Unknown parents, lookup failures, cycles, depth greater
   than the supported chain limit and child validity outside parent validity deny.
-  This is per-request intersection of effective authorization, not static wildcard
-  permission-set containment or a distributed identity verification protocol.
+  The engine also requires each child's effective direct/role permissions to be
+  conservatively contained by its parent's permissions and verifies the complete
+  claimed chain against looked-up ancestors.
 - Missing or invalid policy files prevent default Spring policy initialization.
 
 The published 0.1.0 only stores delegation lineage; it does not enforce the
@@ -54,8 +55,9 @@ ancestor checks. Its expression fallback and approval precedence also differ.
 
 ## Approval storage and execution
 
-The development approval module binds tickets to identity/session, action,
-arguments, resource, environment, expiry, and policy content revision. Separate
+The development approval module binds tickets to identity/session, delegation
+chain, action, canonical arguments, resource, environment, expiry, and policy
+content revision with SHA-256. Separate
 approvers need `agentguard.approval.approve`; self-approval is rejected. Execution
 rechecks policy, verifies the binding and atomically consumes the ticket first.
 Failed execution does not restore a consumed ticket.
@@ -76,7 +78,9 @@ replaying stale caller-created identity objects.
 Sanitization is structured and key/annotation based. It covers maps, collections,
 arrays, records and public bean getters with bounded traversal. Unknown objects,
 cycles and excessive depth are masked. Standard audit-event construction sanitizes
-parameters and context metadata; the JSON publisher sanitizes again before output.
+parameters and context metadata. The JSON publisher emits an arguments hash instead
+of raw arguments and includes identity, delegation, policy, risk, approval and trace
+evidence.
 
 It does not detect secrets embedded in arbitrary strings, intercept every logger,
 redact database contents, or guarantee that all personal data is removed. Configure

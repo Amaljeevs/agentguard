@@ -31,6 +31,7 @@ class YamlPolicyLoaderTest {
         version: "1.0"
         metadata:
           name: "enterprise-mcp-governance"
+          version: "2026-10"
           description: "Core access policy for developer and devops agents"
         roles:
           developer:
@@ -78,7 +79,7 @@ class YamlPolicyLoaderTest {
 
         assertThat(policySet).isNotNull();
         assertThat(policySet.name()).isEqualTo("enterprise-mcp-governance");
-        assertThat(policySet.version()).isEqualTo("1.0");
+        assertThat(policySet.version()).isEqualTo("2026-10");
         assertThat(policySet.roles()).containsKeys("developer", "devops");
         assertThat(policySet.getRole("developer")).isPresent();
         assertThat(policySet.getRole("developer").get().permissions())
@@ -87,6 +88,7 @@ class YamlPolicyLoaderTest {
         assertThat(policySet.rules()).hasSize(2);
         assertThat(policySet.rules().get(0).id()).isEqualTo("deny-dev-prod-db");
         assertThat(policySet.rules().get(1).id()).isEqualTo("prod-deploy-approval");
+        assertThat(policySet.rules().get(1).risk()).isEqualTo(io.agentguard.core.model.RiskLevel.HIGH);
     }
 
     @Test
@@ -220,5 +222,19 @@ class YamlPolicyLoaderTest {
         assertThatThrownBy(() -> loader.load(""))
             .isInstanceOf(InvalidPolicyException.class)
             .hasMessageContaining("content is empty or blank");
+    }
+
+    @Test void shouldRejectDuplicateRuleIds() {
+        String duplicateRules = """
+            version: "1.0"
+            roles:
+              admin:
+                permissions: ["*"]
+            rules:
+              - { id: duplicate, effect: ALLOW, target: { actions: [read] } }
+              - { id: duplicate, effect: DENY, target: { actions: [write] } }
+            """;
+        assertThatThrownBy(() -> loader.load(duplicateRules))
+            .isInstanceOf(InvalidPolicyException.class).hasMessageContaining("Duplicate policy rule id");
     }
 }

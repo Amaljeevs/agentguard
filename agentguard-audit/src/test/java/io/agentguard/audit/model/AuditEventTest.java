@@ -13,6 +13,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
+import java.util.List;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -27,7 +28,7 @@ class AuditEventTest {
             .agentId("devops-01")
             .agentType(AgentType.AUTONOMOUS)
             .role("devops")
-            .delegatedBy("lead-eng")
+            .delegationChain(List.of("root-operator", "lead-eng"))
             .sessionId("sess-123")
             .build();
 
@@ -58,6 +59,9 @@ class AuditEventTest {
         assertThat(event.matchedRuleId()).contains("rule-01");
         assertThat(event.delegatedBy()).contains("lead-eng");
         assertThat(event.sessionId()).contains("sess-123");
+        assertThat(event.delegationChain()).containsExactly("root-operator", "lead-eng");
+        assertThat(event.argumentsHash()).hasSize(64);
+        assertThat(event.traceId()).isNotBlank();
 
         // Verify parameters were sanitized:
         assertThat(event.parameters()).containsEntry("sql", "SELECT * FROM orders;");

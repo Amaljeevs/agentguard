@@ -16,10 +16,17 @@ public record PolicyRule(
     Set<String> targetActions,
     Optional<String> resourceType,
     Optional<String> resourceId,
-    Set<String> environments
-) {
+    Set<String> environments,
+    RiskLevel risk
+    ) {
+    public PolicyRule(String id, Optional<String> description, RuleEffect effect, Set<String> targetRoles,
+                      Set<String> targetActions, Optional<String> resourceType, Optional<String> resourceId,
+                      Set<String> environments) {
+        this(id, description, effect, targetRoles, targetActions, resourceType, resourceId, environments,
+            effect == RuleEffect.APPROVAL_REQUIRED ? RiskLevel.HIGH : effect == RuleEffect.DENY ? RiskLevel.MEDIUM : RiskLevel.LOW);
+    }
     public PolicyRule {
-        Objects.requireNonNull(id, "Rule id must not be null");
+        if (id == null || id.isBlank()) throw new IllegalArgumentException("Rule id must not be blank");
         Objects.requireNonNull(effect, "Rule effect must not be null");
         description = description == null ? Optional.empty() : description;
         targetRoles = targetRoles == null ? Set.of() : Set.copyOf(targetRoles);
@@ -27,6 +34,12 @@ public record PolicyRule(
         resourceType = resourceType == null ? Optional.empty() : resourceType;
         resourceId = resourceId == null ? Optional.empty() : resourceId;
         environments = environments == null ? Set.of() : Set.copyOf(environments);
+        risk = risk == null ? defaultRisk(effect) : risk;
+    }
+
+    private static RiskLevel defaultRisk(RuleEffect effect) {
+        return effect == RuleEffect.APPROVAL_REQUIRED ? RiskLevel.HIGH
+            : effect == RuleEffect.DENY ? RiskLevel.MEDIUM : RiskLevel.LOW;
     }
 
     public static Builder builder(String id, RuleEffect effect) {
@@ -42,6 +55,7 @@ public record PolicyRule(
         private String resourceType;
         private String resourceId;
         private Set<String> environments = Set.of();
+        private RiskLevel risk;
 
         public Builder(String id, RuleEffect effect) {
             this.id = id;
@@ -78,6 +92,11 @@ public record PolicyRule(
             return this;
         }
 
+        public Builder risk(RiskLevel risk) {
+            this.risk = risk;
+            return this;
+        }
+
         public PolicyRule build() {
             return new PolicyRule(
                 id,
@@ -87,7 +106,8 @@ public record PolicyRule(
                 targetActions,
                 Optional.ofNullable(resourceType),
                 Optional.ofNullable(resourceId),
-                environments
+                environments,
+                risk == null ? defaultRisk(effect) : risk
             );
         }
     }

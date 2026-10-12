@@ -16,6 +16,7 @@ class AuthorizationAspectTest {
         int executions;
         @AgentAuthorize(action="orders.read", environment="#missing") public void broken(String input) { executions++; }
         @AgentAuthorize(action="orders.read", environment="#p0", resourceId="#a1") public void positional(String environment, String id) { executions++; }
+        @AgentAuthorize(action="orders.read", resource="#p0") public void alias(String id) { executions++; }
         @AgentAuthorize("orders.read") public void failure() { throw new IllegalStateException("do-not-log-me"); }
     }
     private Tools proxy(Tools target, InMemoryAuditEventPublisher audit) {
@@ -46,5 +47,11 @@ class AuthorizationAspectTest {
         assertThatThrownBy(() -> proxy(new Tools(), audit).failure()).isInstanceOf(IllegalStateException.class);
         assertThat(audit.getEvents().get(1).metadata()).containsEntry("phase", "EXECUTION_FAILED");
         assertThat(audit.getEvents().toString()).doesNotContain("do-not-log-me");
+    }
+    @Test void conciseResourceAliasResolvesLikeResourceId() {
+        var audit = new InMemoryAuditEventPublisher(); var target = new Tools();
+        proxy(target, audit).alias("order-42");
+        assertThat(target.executions).isEqualTo(1);
+        assertThat(audit.getEvents().getFirst().resourceId()).isEqualTo("order-42");
     }
 }

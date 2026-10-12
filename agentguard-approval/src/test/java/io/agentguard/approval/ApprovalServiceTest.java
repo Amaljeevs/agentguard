@@ -48,12 +48,18 @@ class ApprovalServiceTest {
     }
     @Test void exactApprovedRequestExecutesOnceAndAuditContainsNoSecret() {
         String id = approved();
+        assertThat(store.find(id).orElseThrow().state()).isEqualTo(ApprovalTicket.State.APPROVED);
         Object amount = service.execute(id, request("agent", 10), input -> input.action().parameters().get("amount"));
         assertThat(amount).isEqualTo(10);
         assertThatThrownBy(() -> service.execute(id, request("agent", 10), input -> "again")).isInstanceOf(AgentAccessDeniedException.class);
         assertThat(audit.getEvents().toString()).doesNotContain("password=secret");
         assertThat(audit.getEvents().getLast().metadata()).containsEntry("phase", "EXECUTION_SUCCEEDED");
         assertThat(store.find(id).orElseThrow().toString()).doesNotContain("password");
+    }
+    @Test void newTicketStartsInApprovalRequiredLifecycleState() {
+        var ticket = service.request(request("agent", 10), Duration.ofMinutes(5));
+        assertThat(ticket.state()).isEqualTo(ApprovalTicket.State.APPROVAL_REQUIRED);
+        assertThat(audit.getEvents().getLast().metadata()).containsEntry("phase", "APPROVAL_REQUIRED");
     }
     @Test void changedArgumentsIdentityResourceOrPolicyAreRejected() {
         String id = approved();
@@ -80,6 +86,8 @@ class ApprovalServiceTest {
     @Test void expiryIsEnforcedAtTheBoundaryAndIgnoresCallerTimestamp() {
         String id = approved(); currentTime.set(now.plusSeconds(300));
         assertThatThrownBy(() -> service.execute(id, request("agent", 10), input -> "no")).isInstanceOf(AgentAccessDeniedException.class);
+        assertThat(store.find(id).orElseThrow().state()).isEqualTo(ApprovalTicket.State.EXPIRED);
+        assertThat(audit.getEvents().getLast().metadata()).containsEntry("phase", "APPROVAL_EXPIRED");
     }
     @Test void deniedRequestCannotCreateApproval() {
         currentEngine.set(engine(true));
@@ -109,6 +117,7 @@ class ApprovalServiceTest {
     @Test void rejectedTicketCannotExecute() {
         String id = service.request(request("agent", 10), Duration.ofMinutes(5)).id();
         service.reject(id, identity("human", "agentguard.approval.approve"));
+        assertThat(store.find(id).orElseThrow().state()).isEqualTo(ApprovalTicket.State.DENIED);
         assertThatThrownBy(() -> service.execute(id, request("agent", 10), input -> "no")).isInstanceOf(AgentAccessDeniedException.class);
     }
 }

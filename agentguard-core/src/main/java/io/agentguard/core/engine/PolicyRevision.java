@@ -24,6 +24,7 @@ public final class PolicyRevision {
             // Rule order affects which matching explanation is returned, so preserve it.
             policy.rules().forEach(rule -> {
                 add(digest, "rule"); add(digest, rule.id()); add(digest, rule.effect().name());
+                add(digest, rule.risk().name());
                 add(digest, rule.description().orElse(""));
                 sorted(digest, rule.targetRoles()); sorted(digest, rule.targetActions());
                 add(digest, rule.resourceType().orElse("")); add(digest, rule.resourceId().orElse(""));

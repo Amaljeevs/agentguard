@@ -45,7 +45,12 @@ public @interface AgentAuthorize {
      * The target resource identifier. Supports Spring Expression Language (SpEL),
      * e.g. {@code "#clusterName"} or {@code "#payload.databaseId"}.
      */
+    @AliasFor("resource")
     String resourceId() default "";
+
+    /** Concise alias for {@link #resourceId()}. */
+    @AliasFor("resourceId")
+    String resource() default "";
 
     /**
      * The execution environment requirement (e.g. {@code "production"}, {@code "development"}).

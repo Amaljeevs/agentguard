@@ -16,8 +16,8 @@ public record PolicySet(
     List<PolicyRule> rules
 ) {
     public PolicySet {
-        Objects.requireNonNull(name, "PolicySet name must not be null");
-        Objects.requireNonNull(version, "PolicySet version must not be null");
+        if (name == null || name.isBlank()) throw new IllegalArgumentException("PolicySet name must not be blank");
+        if (version == null || version.isBlank()) throw new IllegalArgumentException("PolicySet version must not be blank");
         roles = roles == null ? Map.of() : Map.copyOf(roles);
         rules = rules == null ? List.of() : List.copyOf(rules);
     }
@@ -25,6 +25,9 @@ public record PolicySet(
     public Optional<RoleDefinition> getRole(String roleName) {
         return Optional.ofNullable(roles.get(roleName));
     }
+
+    /** Stable policy identifier; retained as an alias so existing name-based policies remain compatible. */
+    public String policyId() { return name; }
 
     public static Builder builder(String name, String version) {
         return new Builder(name, version);

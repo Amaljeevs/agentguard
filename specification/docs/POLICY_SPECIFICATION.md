@@ -11,7 +11,7 @@ rules before grants and does not enforce delegation ancestry.
 
 A valid `agentguard-policy.yaml` has the following sections:
 1. `version`: Mandatory string (`"1"` or `"1.0"`).
-2. `metadata`: Optional name and description attributes.
+2. `metadata`: Optional stable policy ID (`name`), deployed revision (`version`) and description.
 3. `roles`: Map of role identifiers to permission lists.
 4. `rules`: Ordered list of fine-grained contextual rules (ABAC, environment, approvals).
 
@@ -19,6 +19,7 @@ A valid `agentguard-policy.yaml` has the following sections:
 version: "1.0"
 metadata:
   name: "string"
+  version: "deployment/revision identifier"
   description: "string"
 
 roles:
@@ -31,6 +32,7 @@ rules:
   - id: "string"
     description: "string"
     effect: ALLOW | DENY | APPROVAL_REQUIRED
+    risk: LOW | MEDIUM | HIGH | CRITICAL
     target:
       roles: ["role1", "role2"]
       actions: ["action.pattern"]
@@ -77,7 +79,10 @@ one rule are combined: role membership, action pattern, resource type/id and
 environment must all match when specified. Role and action target lists use any
 matching member. Environment `equals` and `in` values are combined into a set.
 
-The first matching rule of the relevant effect supplies the explanation. A
+The top-level `version` selects the policy schema. Optional `metadata.version`
+is the deployed policy revision returned in decisions; it falls back to the
+schema version for older documents. Rule IDs must be unique. The first matching
+rule of the relevant effect supplies the explanation. A
 content fingerprint includes the ordered rules and sorted role permissions;
 changing a policy invalidates approvals issued for its previous fingerprint.
 
@@ -91,10 +96,16 @@ failures, cycles, excessive depth and child validity outside parent validity
 are denied. The default lookup resolves no parents, so delegated identities
 are denied unless a trusted lookup is configured.
 
-This is per-request intersection of authorization decisions. It does not compute
-a static subset relation for arbitrary wildcard permission sets, authenticate
-untrusted identities, or issue delegated credentials. The application owns those
-identity lifecycle responsibilities.
+The child effective permission set must be contained by its parent's set. Exact
+permissions and simple prefix/suffix wildcards are compared conservatively;
+ambiguous wildcard containment denies. A complete root-to-parent chain must match
+the trusted identities returned by the lookup, and the configured maximum depth
+defaults to eight. AgentGuard does not authenticate untrusted identities or issue
+delegated credentials; the identity provider owns those lifecycle responsibilities.
+
+Each decision includes the policy ID, declared version, content SHA-256, matched
+rule, reason, risk and trace ID. Supplying a trusted fixed timestamp and trace ID
+produces deterministic evaluation output for policy tests.
 
 ## 5. Test policy behavior before deployment
 

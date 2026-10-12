@@ -10,6 +10,10 @@ import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Map;
+import java.time.Instant;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -47,5 +51,23 @@ class SpringSecurityAgentIdentityResolverTest {
         AgentIdentity identity = identityOpt.get();
         assertThat(identity.agentId()).isEqualTo("coding-agent-17");
         assertThat(identity.roles()).containsExactlyInAnyOrder("developer", "reviewer");
+    }
+
+    @Test void shouldMapClaimsOnlyAfterSpringHasProducedAuthenticatedJwtToken() {
+        Instant now = Instant.now();
+        Jwt jwt = Jwt.withTokenValue("opaque-test-value").header("alg", "RS256")
+            .issuer("https://issuer.example").subject("human")
+            .issuedAt(now.minusSeconds(10)).expiresAt(now.plusSeconds(300))
+            .claim("client_id", "trusted-agent").claim("scope", "orders.read orders.refund")
+            .claim("tenant", "tenant-a").claim("actor", Map.of("sub", "orchestrator"))
+            .build();
+        SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt,
+            List.of(new SimpleGrantedAuthority("SCOPE_orders.read"))));
+
+        AgentIdentity identity = resolver.resolveCurrentIdentity().orElseThrow();
+        assertThat(identity.agentId()).isEqualTo("trusted-agent");
+        assertThat(identity.permissions()).containsExactlyInAnyOrder("orders.read", "orders.refund");
+        assertThat(identity.tenantId()).contains("tenant-a");
+        assertThat(identity.delegationChain()).containsExactly("orchestrator");
     }
 }

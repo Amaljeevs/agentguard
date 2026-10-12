@@ -25,6 +25,7 @@ public class AgentGuardProperties {
      * Default execution environment context if not specified by the tool.
      */
     private String environment = "development";
+    private int maxDelegationDepth = 8;
 
     /**
      * Audit configuration settings.
@@ -58,6 +59,9 @@ public class AgentGuardProperties {
     public AuditProperties getAudit() {
         return audit;
     }
+
+    public int getMaxDelegationDepth() { return maxDelegationDepth; }
+    public void setMaxDelegationDepth(int maxDelegationDepth) { this.maxDelegationDepth = maxDelegationDepth; }
 
     public void setAudit(AuditProperties audit) {
         this.audit = audit;

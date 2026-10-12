@@ -8,6 +8,7 @@ import io.agentguard.core.model.PolicyRule;
 import io.agentguard.core.model.PolicySet;
 import io.agentguard.core.model.RoleDefinition;
 import io.agentguard.core.model.RuleEffect;
+import io.agentguard.core.model.RiskLevel;
 import io.agentguard.policy.dto.PolicyDocumentDto;
 import io.agentguard.policy.dto.RoleDto;
 import io.agentguard.policy.dto.RuleDto;
@@ -65,8 +66,6 @@ public class YamlPolicyLoader implements PolicyLoader {
             return compile(dto);
         } catch (JsonProcessingException e) {
             throw new InvalidPolicyException("Failed to parse YAML policy syntax: " + e.getOriginalMessage(), e);
-        } catch (IOException e) {
-            throw new InvalidPolicyException("I/O error while reading policy content: " + e.getMessage(), e);
         }
     }
 
@@ -123,10 +122,14 @@ public class YamlPolicyLoader implements PolicyLoader {
 
         // 3. Validate rules
         List<PolicyRule> compiledRules = new ArrayList<>();
+        Set<String> ruleIds = new HashSet<>();
         if (dto.rules() != null) {
             for (RuleDto ruleDto : dto.rules()) {
                 if (ruleDto.id() == null || ruleDto.id().isBlank()) {
                     throw new InvalidPolicyException("Policy rule is missing mandatory 'id'");
+                }
+                if (!ruleIds.add(ruleDto.id())) {
+                    throw new InvalidPolicyException("Duplicate policy rule id: '" + ruleDto.id() + "'");
                 }
 
                 RuleEffect effect;
@@ -140,6 +143,13 @@ public class YamlPolicyLoader implements PolicyLoader {
                 }
 
                 PolicyRule.Builder builder = PolicyRule.builder(ruleDto.id(), effect);
+                if (ruleDto.risk() != null) {
+                    try { builder.risk(RiskLevel.valueOf(ruleDto.risk().toUpperCase())); }
+                    catch (IllegalArgumentException invalid) {
+                        throw new InvalidPolicyException("Invalid risk '" + ruleDto.risk() + "' on rule '" + ruleDto.id()
+                            + "'. Must be one of: LOW, MEDIUM, HIGH, CRITICAL");
+                    }
+                }
                 if (ruleDto.description() != null) {
                     builder.description(ruleDto.description());
                 }
@@ -178,11 +188,23 @@ public class YamlPolicyLoader implements PolicyLoader {
         }
 
         String policyName = "agentguard-policy";
+        String policyVersion = dto.version();
         if (dto.metadata() != null && dto.metadata().containsKey("name")) {
-            policyName = String.valueOf(dto.metadata().get("name"));
+            Object name = dto.metadata().get("name");
+            if (!(name instanceof String text) || text.isBlank()) {
+                throw new InvalidPolicyException("Policy metadata.name must be a non-blank string");
+            }
+            policyName = text;
+        }
+        if (dto.metadata() != null && dto.metadata().containsKey("version")) {
+            Object declaredVersion = dto.metadata().get("version");
+            if (!(declaredVersion instanceof String text) || text.isBlank()) {
+                throw new InvalidPolicyException("Policy metadata.version must be a non-blank string");
+            }
+            policyVersion = text;
         }
 
-        return PolicySet.builder(policyName, dto.version())
+        return PolicySet.builder(policyName, policyVersion)
             .roles(compiledRoles)
             .rules(compiledRules)
             .build();

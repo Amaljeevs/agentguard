@@ -53,7 +53,9 @@ Environment comes from the order's H2 row.
 Only wrapped callbacks are registered on the MCP server. The callback wrapper
 checks policy before invoking the actual operation, so it does not depend on
 Spring proxy self-invocation behavior. Tool schemas/metadata and execution
-context are preserved. MCP denial/approval are tool execution errors with
+context are preserved. A shared `ApprovalService` lets an approval-required
+Spring AI callback create the exact bound ticket before it blocks execution;
+the returned error includes that ticket ID. MCP denial/approval are tool execution errors with
 `isError=true`, as produced by Spring AI's MCP adapter; they are not invented
 transport-level JSON-RPC errors. The separate `agentguard-mcp` mapper remains
 available for applications choosing their own error envelope.
@@ -77,6 +79,10 @@ identity/ticket, replay, and insufficient permissions are rejected. Invocation
 uses an immutable argument snapshot. Ticket consumption happens before execution;
 a failed/crashed operation does not make the ticket reusable. This is at-most-once
 admission, not a distributed exactly-once transaction guarantee.
+
+The explicit request endpoint remains useful for review UIs. The guarded MCP
+callback uses the same service and store, so a ticket ID returned by its
+`APPROVAL_REQUIRED` error can be sent directly to the approve and execute endpoints.
 
 `InMemoryApprovalStore` is a bounded single-process reference implementation.
 Implement `ApprovalStore.update` atomically in your shared database for multiple

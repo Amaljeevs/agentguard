@@ -33,9 +33,11 @@ public final class JsonAuditEventPublisher implements AuditEventPublisher {
             data.put("agentId", event.agentId()); data.put("action", event.action());
             data.put("resourceType", event.resourceType()); data.put("resourceId", event.resourceId());
             data.put("environment", event.environment()); data.put("decision", event.decision().name());
-            data.put("ruleId", event.matchedRuleId().orElse(null));
-            data.put("delegatedBy", event.delegatedBy().orElse(null));
-            data.put("parameters", sanitizer.sanitize(event.parameters()));
+            data.put("reason", event.reason()); data.put("matchedPolicy", event.matchedPolicyName().orElse(null));
+            data.put("ruleId", event.matchedRuleId().orElse(null)); data.put("policyVersion", event.policyVersion().orElse(null));
+            data.put("policyHash", event.policyHash().orElse(null)); data.put("risk", event.riskLevel().name());
+            data.put("traceId", event.traceId()); data.put("delegationChain", event.delegationChain());
+            data.put("argumentsHash", event.argumentsHash()); data.put("approvalRequestId", event.approvalRequestId().orElse(null));
             data.put("metadata", sanitizer.sanitize(event.metadata()));
             String json = mapper.writeValueAsString(data);
             if (event.decision() == Decision.ALLOW && !"EXECUTION_FAILED".equals(event.metadata().get("phase"))) logger.info("{}", json);

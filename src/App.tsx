@@ -1060,9 +1060,9 @@ rules:
                                ▼
                [AgentGuard Core Policy Engine (Stateless PDP)]
                  ├── 1. Evaluate Explicit DENY Rules (Deny Precedence)
-                 ├── 2. Evaluate APPROVAL_REQUIRED Rules (Human Gatekeeper)
-                 ├── 3. Evaluate Explicit ALLOW Rules
-                 ├── 4. Evaluate RBAC Permissions (Hierarchical Wildcard Match)
+                 ├── 2. Establish Explicit ALLOW or RBAC Permission
+                 ├── 3. Apply APPROVAL_REQUIRED as a Restriction
+                 ├── 4. Verify Delegation Chain and Permission Subset
                  └── 5. Default Fallback ──► DENY (Deny by Default)
                                │
                 ┌──────────────┼──────────────┐
@@ -1134,6 +1134,12 @@ rules:
                       <td className="py-3 px-3 font-semibold text-white">Audit Log Secret Leakage</td>
                       <td className="py-3 px-3 text-slate-400">Database passwords or API tokens leak into audit events.</td>
                       <td className="py-3 px-3 text-emerald-300">Automatic parameter sanitization masks passwords, keys, and tokens.</td>
+                    </tr>
+                    <tr>
+                      <td className="py-3 px-3 font-mono text-indigo-400 font-bold">TM-07</td>
+                      <td className="py-3 px-3 font-semibold text-white">Approval Tampering / Replay</td>
+                      <td className="py-3 px-3 text-slate-400">Arguments change after review or one approval executes twice.</td>
+                      <td className="py-3 px-3 text-emerald-300">Canonical request hash, policy binding, expiry, and atomic single-use consumption.</td>
                     </tr>
                   </tbody>
                 </table>
