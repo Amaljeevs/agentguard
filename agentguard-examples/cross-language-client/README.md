@@ -6,13 +6,32 @@ AgentGuard is implemented in native Java 21, but any AI agent environment (Pytho
 POST /v1/authorize
 ```
 
-```text
-Python Agent ─────┐
-TypeScript Agent ─┤
-Go Agent ─────────┼── HTTPS ── AgentGuard Authorization Service
-Rust Agent ───────┘                    │
-                                       ▼
-                             Policy / Approval / Audit
+```mermaid
+flowchart LR
+    subgraph Clients["Polyglot AI Agents"]
+        PY["🐍 Python Agent\n(LangChain / LlamaIndex / CrewAI)"]
+        TS["⚡ TypeScript Agent\n(Node.js / Vercel AI SDK)"]
+        GO["🔷 Go & Rust Workloads\n(Native Services)"]
+    end
+
+    subgraph Identity["Upstream Identity"]
+        IDP["🔑 Identity Provider\n(OAuth2 / OIDC / SPIFFE)"]
+    end
+
+    subgraph Service["AgentGuard Authorization Service"]
+        API["🌐 REST API: POST /v1/authorize"]
+        PDP["🛡️ Policy Decision Point (PDP)\n(Deterministic Rules & Conditions)"]
+        APP["✍️ Approval Service\n(Exact-Request SHA-256 Binding)"]
+        AUD["📜 Parameter-Sanitized Audit Trail\n(Hash, Trace ID, Redaction)"]
+    end
+
+    IDP -.->|"Verified JWT / SVID"| Clients
+    PY -->|"HTTPS + Bearer Token"| API
+    TS -->|"HTTPS + Bearer Token"| API
+    GO -->|"HTTPS + Bearer Token"| API
+    API --> PDP
+    PDP --> APP
+    PDP --> AUD
 ```
 
 ## Security Invariants

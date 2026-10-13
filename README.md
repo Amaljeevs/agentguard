@@ -403,76 +403,233 @@ Ready-to-run examples demonstrating AgentGuard patterns across enterprise domain
 
 ## Using AgentGuard from other languages
 
-While AgentGuard is natively implemented in Java 21, non-Java applications (Python, TypeScript, Go, Rust) consume the authorization engine as a standalone decision service via the language-neutral HTTP API exposed by `agentguard-spring-web`:
+While AgentGuard is natively implemented in Java 21, non-Java AI agents (Python, TypeScript/Node.js, Go, Rust) consume the authorization engine as a standalone, language-neutral decision service via the REST API exposed by `agentguard-spring-web`.
 
-```text
-Python Agent ─────┐
-TypeScript Agent ─┤
-Go Agent ─────────┼── HTTPS ── AgentGuard Authorization Service
-Rust Agent ───────┘                    │
-                                       ▼
-                             Policy / Approval / Audit
+```mermaid
+flowchart LR
+    subgraph Clients["Polyglot AI Agents"]
+        PY["🐍 Python Agent\n(LangChain / LlamaIndex / CrewAI)"]
+        TS["⚡ TypeScript Agent\n(Node.js / Vercel AI SDK)"]
+        GO["🔷 Go & Rust Workloads\n(Native Services)"]
+    end
+
+    subgraph Identity["Upstream Identity"]
+        IDP["🔑 Identity Provider\n(OAuth2 / OIDC / SPIFFE)"]
+    end
+
+    subgraph Service["AgentGuard Authorization Service"]
+        API["🌐 REST API: POST /v1/authorize"]
+        PDP["🛡️ Policy Decision Point (PDP)\n(Deterministic Rules & Conditions)"]
+        APP["✍️ Approval Service\n(Exact-Request SHA-256 Binding)"]
+        AUD["📜 Parameter-Sanitized Audit Trail\n(Hash, Trace ID, Redaction)"]
+    end
+
+    IDP -.->|"Verified JWT / SVID"| Clients
+    PY -->|"HTTPS + Bearer Token"| API
+    TS -->|"HTTPS + Bearer Token"| API
+    GO -->|"HTTPS + Bearer Token"| API
+    API --> PDP
+    PDP --> APP
+    PDP --> AUD
 ```
 
 ### Key Integration Principles
+
 1. **Model Intent vs. Application Authority**: Untrusted AI agents and LLMs must never invent or supply their own effective identity, roles, or scopes. Effective identity is supplied by trusted authentication middleware (e.g. verified Bearer JWT, mTLS, SPIFFE SVID) extracted at the transport boundary.
 2. **Deterministic Governance**: Client applications submit the proposed action, target resource, raw arguments, and environment context. AgentGuard returns `ALLOW`, `DENY`, or `APPROVAL_REQUIRED`.
 3. **Fail-Closed Execution**: Tools and downstream APIs must only execute when AgentGuard returns an affirmative `ALLOW`.
 4. **Human-in-the-Loop Resumption**: When `APPROVAL_REQUIRED` is returned, execution halts. Human reviewers approve the request-bound ticket via the approval API; the agent may only proceed once an approved ticket is presented and atomically consumed.
 
-### Python Example
+### Request & Response Schema
 
-```python
-import json, urllib.request
-
-payload = {
-    "action": "kubernetes.deploy",
-    "resource": {"type": "cluster", "id": "prod-east", "tags": {"env": "production"}},
-    "arguments": {"image": "payments-api:v2.4", "replicas": 3},
-    "context": {"environment": "production"}
-}
-
-req = urllib.request.Request(
-    "http://agentguard-service:8080/v1/authorize",
-    data=json.dumps(payload).encode("utf-8"),
-    headers={"Content-Type": "application/json", "Authorization": "Bearer <VERIFIED_ID_TOKEN>"},
-    method="POST"
-)
-
-with urllib.request.urlopen(req) as resp:
-    decision = json.loads(resp.read().decode("utf-8"))
-    if decision["decision"] == "ALLOW":
-        deploy_tool(**payload["arguments"])  # Safe to execute
-    elif decision["decision"] == "APPROVAL_REQUIRED":
-        notify_approvers(decision["approvalRequestId"])
-    else:
-        raise PermissionError(f"Denied: {decision['reason']}")
+```http
+POST /v1/authorize
+Content-Type: application/json
+Authorization: Bearer <VERIFIED_JWT_OR_SPIFFE_TOKEN>
 ```
 
-### TypeScript / Node.js Example
+```json
+{
+  "action": "kubernetes.deploy",
+  "resource": {
+    "type": "cluster",
+    "id": "prod-east",
+    "tags": { "env": "production" }
+  },
+  "arguments": {
+    "image": "payments-api:v2.4",
+    "replicas": 3
+  },
+  "context": {
+    "environment": "production"
+  }
+}
+```
+
+```json
+{
+  "decision": "APPROVAL_REQUIRED",
+  "reason": "Production deployments require DevOps lead sign-off",
+  "matchedPolicy": "cloud-infrastructure",
+  "matchedRule": "prod-deploy-gate",
+  "policyVersion": "2026-10",
+  "policyHash": "e2b895e0e0a0...",
+  "risk": "HIGH",
+  "approvalRequestId": "ticket-7f3b89a1-...",
+  "traceId": "trace-9843-abcd"
+}
+```
+
+### 🐍 Python Example
+
+A minimal, dependency-free Python client using the standard library:
+
+```python
+import json
+import os
+import urllib.error
+import urllib.request
+from typing import Any, Dict
+
+AGENTGUARD_URL = os.getenv("AGENTGUARD_URL", "http://localhost:8080/v1/authorize")
+AUTH_TOKEN = os.getenv("AUTH_TOKEN", "Bearer <VERIFIED_TOKEN_FROM_IDP>")
+
+
+def authorize_action(
+    action: str,
+    resource_type: str,
+    resource_id: str,
+    arguments: Dict[str, Any],
+    environment: str = "production",
+) -> Dict[str, Any]:
+    """Submits a tool authorization request to AgentGuard."""
+    payload = {
+        "action": action,
+        "resource": {"type": resource_type, "id": resource_id, "tags": {"env": environment}},
+        "arguments": arguments,
+        "context": {"environment": environment},
+    }
+
+    req = urllib.request.Request(
+        AGENTGUARD_URL,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": AUTH_TOKEN,
+            "User-Agent": "AgentGuard-Python-Client/1.0.0",
+        },
+        method="POST",
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=5) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        error_body = exc.read().decode("utf-8")
+        if exc.code == 403:
+            return json.loads(error_body)
+        raise RuntimeError(f"AgentGuard error ({exc.code}): {error_body}") from exc
+
+
+# Usage in an Agent tool dispatcher
+decision = authorize_action(
+    action="kubernetes.deploy",
+    resource_type="cluster",
+    resource_id="prod-east",
+    arguments={"image": "payments-api:v2.4", "replicas": 3},
+    environment="production",
+)
+
+if decision["decision"] == "ALLOW":
+    print(f"✓ Authorized by policy {decision.get('matchedPolicy')}. Executing tool...")
+    # Safe to execute tool
+elif decision["decision"] == "APPROVAL_REQUIRED":
+    approval_id = decision.get("approvalRequestId")
+    print(f"! Pausing workflow: Human approval required (Ticket: {approval_id})")
+    # Notify approvers via Slack/Webhook, then wait for single-use approval ticket
+else:
+    raise PermissionError(f"✗ Denied: {decision.get('reason')} (Rule: {decision.get('matchedRule')})")
+```
+
+### ⚡ TypeScript / Node.js Example
+
+A clean, strongly-typed TypeScript client:
 
 ```typescript
-const response = await fetch("http://agentguard-service:8080/v1/authorize", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-    "Authorization": "Bearer " + verifiedJwtToken
-  },
-  body: JSON.stringify({
+import { z } from "zod"; // optional runtime validator, or native fetch
+
+interface AuthorizationRequest {
+  action: string;
+  resource: {
+    type: string;
+    id: string;
+    tags?: Record<string, string>;
+  };
+  arguments: Record<string, unknown>;
+  context?: {
+    environment?: string;
+    metadata?: Record<string, string>;
+  };
+}
+
+interface AuthorizationResponse {
+  decision: "ALLOW" | "DENY" | "APPROVAL_REQUIRED";
+  reason: string;
+  matchedPolicy?: string;
+  matchedRule?: string;
+  policyVersion?: string;
+  policyHash?: string;
+  risk?: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  approvalRequestId?: string | null;
+  traceId?: string;
+}
+
+const AGENTGUARD_URL = process.env.AGENTGUARD_URL || "http://localhost:8080/v1/authorize";
+const AUTH_TOKEN = process.env.AUTH_TOKEN || "Bearer <VERIFIED_TOKEN_FROM_IDP>";
+
+export async function authorizeAction(request: AuthorizationRequest): Promise<AuthorizationResponse> {
+  const response = await fetch(AGENTGUARD_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": AUTH_TOKEN,
+      "User-Agent": "AgentGuard-TypeScript-Client/1.0.0"
+    },
+    body: JSON.stringify(request)
+  });
+
+  if (!response.ok && response.status !== 403) {
+    const errorBody = await response.text();
+    throw new Error(`AgentGuard request failed (HTTP ${response.status}): ${errorBody}`);
+  }
+
+  return (await response.json()) as AuthorizationResponse;
+}
+
+// Example usage in an autonomous agent runner
+async function runGuardedTool() {
+  const decision = await authorizeAction({
     action: "kubernetes.deploy",
     resource: { type: "cluster", id: "prod-east", tags: { env: "production" } },
     arguments: { image: "payments-api:v2.4", replicas: 3 },
     context: { environment: "production" }
-  })
-});
+  });
 
-const decision = await response.json();
-if (decision.decision === "ALLOW") {
-  await executeDeployTool();
-} else if (decision.decision === "APPROVAL_REQUIRED") {
-  pauseWorkflowForApproval(decision.approvalRequestId);
-} else {
-  throw new Error(`Execution blocked: ${decision.reason}`);
+  switch (decision.decision) {
+    case "ALLOW":
+      console.log(`✓ Access granted via ${decision.matchedPolicy}. Executing deployment...`);
+      // invoke deployment tool callback
+      break;
+
+    case "APPROVAL_REQUIRED":
+      console.warn(`! Action paused: Approval required. Request ID: ${decision.approvalRequestId}`);
+      // pause agent loop until ticket is approved and consumed
+      break;
+
+    case "DENY":
+    default:
+      throw new Error(`✗ Tool blocked: ${decision.reason} [Rule: ${decision.matchedRule}]`);
+  }
 }
 ```
 
