@@ -1,9 +1,6 @@
 # AgentGuard
-<img width="2172" height="724" alt="AgentGuard_ Secure AI Systems" src="https://github.com/user-attachments/assets/62c8dbf5-5d59-46a1-a389-c430e220e068" />
 
 **Tool-level authorization, request-bound approvals, and sanitized audit trails for AI agents.**
-
-> **AgentGuard provides deterministic authorization and governance for AI agent actions and complements OAuth/JWT/Spring Security rather than replacing authentication.**
 
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.amaljeevs/agentguard-parent.svg?color=007ec6&label=Maven%20Central)](https://central.sonatype.com/artifact/io.github.amaljeevs/agentguard-parent)
 [![GitHub Release](https://img.shields.io/github/v/release/Amaljeevs/agentguard?color=10b981&label=Release)](https://github.com/Amaljeevs/agentguard/releases)
@@ -12,6 +9,7 @@
 [![Javadoc](https://javadoc.io/badge2/io.github.amaljeevs/agentguard-parent/javadoc.svg)](https://javadoc.io/doc/io.github.amaljeevs/agentguard-parent)
 [![Java](https://img.shields.io/badge/Java-21%2B-orange.svg)](https://openjdk.org/projects/jdk/21/)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+<img width="2172" height="724" alt="AgentGuard_ Secure AI Systems" src="https://github.com/user-attachments/assets/62c8dbf5-5d59-46a1-a389-c430e220e068" />
 
 **Current release: 0.2.1** (Published on Maven Central | 1.0.0 planned stable release)
 
