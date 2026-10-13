@@ -1,0 +1,20 @@
+server:
+  address: 127.0.0.1
+  port: 8083
+
+spring:
+  datasource:
+    url: jdbc:h2:mem:fintech-banking;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ""
+
+agentguard:
+  audit:
+    mask-token: "[REDACTED]"
+    sensitive-keys:
+      - routingNumber
+      - iban
+      - accountSecret
+      - taxId
+      - beneficiarySecret
+      - clientSecret

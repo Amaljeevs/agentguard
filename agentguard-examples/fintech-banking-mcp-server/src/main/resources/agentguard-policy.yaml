@@ -1,0 +1,111 @@
+version: "1.0"
+metadata:
+  name: fintech-banking-governance
+  version: "2026-10"
+  description: "Enterprise fintech, payments, escrow, B2B, and API management policy for AgentGuard"
+
+roles:
+  fintech-agent:
+    description: "Automated fintech banking agent for customer payments, escrows, and virtual accounts"
+    permissions:
+      - payments.*
+      - escrow.*
+      - accounts.virtual.*
+      - apimgmt.client.create
+
+  corporate-finance-agent:
+    description: "Corporate finance bot authorized to submit payroll and supplier disbursements"
+    permissions:
+      - payments.transfer
+      - b2b.payroll.disburse
+      - b2b.vendor.disburse
+
+  corporate-cfo:
+    description: "Corporate Chief Financial Officer with approval authority over large treasury batches"
+    permissions:
+      - b2b.*
+      - payments.*
+      - agentguard.approval.approve
+
+  compliance-officer:
+    description: "AML/KYC compliance auditor with approval authority over tier-3 accounts and payments"
+    permissions:
+      - payments.*
+      - escrow.*
+      - accounts.virtual.*
+      - agentguard.approval.approve
+
+  security-officer:
+    description: "API Security platform administrator with approval authority over client credentials"
+    permissions:
+      - apimgmt.*
+      - agentguard.approval.approve
+
+  guest-agent:
+    description: "Unprivileged guest agent with read-only access"
+    permissions:
+      - payments.read
+
+rules:
+  - id: deny-wildcard-scopes
+    effect: DENY
+    risk: CRITICAL
+    description: "Prevent LLM prompt injection from generating unauthorized wildcard or root API scopes"
+    target:
+      actions:
+        - apimgmt.wildcard
+
+  - id: disputed-escrow-deny
+    effect: DENY
+    risk: HIGH
+    description: "Prevent release of escrow contracts flagged with dispute status"
+    target:
+      actions:
+        - escrow.release
+      resources:
+        type: escrow-disputed
+
+  - id: production-payment-review
+    effect: APPROVAL_REQUIRED
+    risk: HIGH
+    description: "Production funds transfers require human authorization"
+    target:
+      actions:
+        - payments.transfer
+      conditions:
+        environment:
+          in: [production, stage]
+
+  - id: b2b-corporate-disbursement-review
+    effect: APPROVAL_REQUIRED
+    risk: CRITICAL
+    description: "Corporate payroll and vendor batch settlements require executive signoff"
+    target:
+      actions:
+        - b2b.payroll.disburse
+        - b2b.vendor.disburse
+      conditions:
+        environment:
+          equals: production
+
+  - id: production-api-client-review
+    effect: APPROVAL_REQUIRED
+    risk: HIGH
+    description: "Production API client issuance requires security officer authorization"
+    target:
+      actions:
+        - apimgmt.client.create
+      conditions:
+        environment:
+          equals: production
+
+  - id: high-tier-virtual-account-review
+    effect: APPROVAL_REQUIRED
+    risk: HIGH
+    description: "High-volume Tier 3 virtual accounts require compliance officer review"
+    target:
+      actions:
+        - accounts.virtual.create
+      conditions:
+        environment:
+          equals: production-tier3

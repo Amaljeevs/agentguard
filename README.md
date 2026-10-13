@@ -279,7 +279,19 @@ module by using the `GuardedToolCallback` constructor that accepts an
 the bound approval request ID. MCP remains a small error adapter and is absent
 from the core engine.
 
-For a complete non-Java client implementation, see the [Python Cross-Language Client Example](agentguard-examples/cross-language-client/README.md).
+## Architecture Examples & Showcases
+
+Ready-to-run examples demonstrating AgentGuard patterns across enterprise domains:
+
+* **[Enterprise Fintech & Banking MCP Server](agentguard-examples/fintech-banking-mcp-server/README.md)**:
+  Full-featured Model Context Protocol (MCP) server implementing critical financial workflows:
+  - **Payments & Wire Transfers**: Domestic & cross-border transfers with amount threshold governance. Canonical SHA-256 argument hashing strictly defeats LLM prompt injection and parameter tampering (e.g., silently altering payout amounts).
+  - **B2B Corporate Disbursements**: Batch payroll and vendor payouts with cryptographic delegation chains (`CFO -> Payroll Bot`) and dual executive signoff.
+  - **Escrow Contracts & Dispute Freeze**: Milestone-based fund releases with fail-closed state invariants that block automated releases when contracts are flagged as disputed.
+  - **API Management via LLMs**: Prevents prompt injection from generating unauthorized wildcard or admin scopes (`*`), requiring security review for production credentials.
+  - **Virtual Accounts & KYC Tiers**: Tier-based issuance limits (automated for Tier 1; human compliance review for high-volume Tier 3).
+* **[Spring AI MCP Server](agentguard-examples/spring-ai-mcp-server/README.md)**: Real streamable HTTP MCP server integrating Spring AI tools with AgentGuard authorization, audit redaction, and approval lifecycle.
+* **[Python Cross-Language Client](agentguard-examples/cross-language-client/README.md)**: Minimal non-Java client consuming `POST /v1/authorize` with upstream identity injection.
 
 ## Durable Approval Store (PostgreSQL)
 

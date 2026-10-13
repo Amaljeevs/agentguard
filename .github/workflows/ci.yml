@@ -31,6 +31,9 @@ jobs:
       - name: Verify candidate over real MCP transport
         run: ./mvnw -f agentguard-examples/spring-ai-mcp-server/pom.xml verify --batch-mode --no-transfer-progress
 
+      - name: Verify fintech banking MCP server
+        run: ./mvnw -f agentguard-examples/fintech-banking-mcp-server/pom.xml verify --batch-mode --no-transfer-progress
+
       - name: Test declarative policy scenarios
         run: >-
           ./mvnw -f agentguard-policy/pom.xml org.codehaus.mojo:exec-maven-plugin:3.5.0:java
