@@ -45,7 +45,9 @@ Use AgentGuard when:
 
 ## Quickstart: Integrate AgentGuard
 
-Add the starter dependency to your Spring Boot 3 application:
+### 1. Maven Dependencies
+
+AgentGuard is modular. For a standard Spring Boot 3 application, you only need **`agentguard-spring-boot-starter`**:
 
 ```xml
 <dependency>
@@ -55,62 +57,103 @@ Add the starter dependency to your Spring Boot 3 application:
 </dependency>
 ```
 
-Configure authentication through Spring Security or supply a trusted `AgentIdentityResolver`. Never accept identity/roles directly from model arguments.
+> [!NOTE]
+> `agentguard-spring-boot-starter` automatically brings in the core engine (`agentguard-core`), policy loader (`agentguard-policy`), audit sanitizer (`agentguard-audit`), and `@AgentAuthorize` annotations (`agentguard-spring`).
+>
+> **Do not add `agentguard-parent` directly as a `<dependency>`**; it has `<packaging>pom</packaging>` and produces no JAR file. If you wish to manage versions centrally, import `agentguard-parent` inside `<dependencyManagement>` as a BOM (Bill of Materials):
+> ```xml
+> <dependencyManagement>
+>     <dependencies>
+>         <dependency>
+>             <groupId>io.github.amaljeevs</groupId>
+>             <artifactId>agentguard-parent</artifactId>
+>             <version>0.2.1</version>
+>             <type>pom</type>
+>             <scope>import</scope>
+>         </dependency>
+>     </dependencies>
+> </dependencyManagement>
+> ```
+
+#### Optional Feature Modules
+Add only the components your application requires:
+
+| Feature | Dependency | What it provides |
+| :--- | :--- | :--- |
+| **Human Approvals** | `agentguard-approval` | `ApprovalService`, tickets, SHA-256 argument binding, `PostgresApprovalStore` |
+| **Spring AI & MCP Tools** | `agentguard-spring-ai` | `GuardedToolCallback` wrapper for pre-execution Model Context Protocol enforcement |
+| **Polyglot REST API** | `agentguard-spring-web` | Auto-configured `POST /v1/authorize` controller for non-Java clients (Python, Node.js) |
+
+---
+
+### 2. Configure Declarative Policy
 
 Create `src/main/resources/agentguard-policy.yaml`:
 
 ```yaml
 version: "1.0"
 metadata:
-  name: order-governance
+  name: fintech-payments-governance
   version: "2026-10"
+
 roles:
-  operator:
-    permissions: [orders.read, orders.refund]
+  payment-agent:
+    permissions:
+      - payments.transfer
+      - payments.read
+
 rules:
-  - id: production-refund-review
+  - id: production-high-value-transfer-review
     effect: APPROVAL_REQUIRED
     risk: HIGH
     target:
-      actions: [orders.refund]
+      actions:
+        - payments.transfer
       conditions:
         environment:
           equals: production
 ```
 
-Protect Spring-managed service methods:
+---
+
+### 3. Protect Methods with `@AgentAuthorize`
+
+Configure authentication through Spring Security or supply a trusted `AgentIdentityResolver`. Never accept identity or roles directly from untrusted model arguments.
 
 ```java
-@AgentAuthorize(action = "kubernetes.deploy", resourceType = "cluster",
-    resource = "#cluster", environment = "production")
-public void deploy(String cluster) {
-    // Application SQL/client operation, executed only after authorization allows it.
+@Service
+public class TreasuryTransferService {
+
+    @AgentAuthorize(
+        action = "payments.transfer",
+        resourceType = "account",
+        resource = "#fromAccount",
+        environment = "production"
+    )
+    public PaymentReceipt transferFunds(String fromAccount, String toAccount, BigDecimal amount) {
+        // Core banking ledger operation, executed only after AgentGuard authorizes it.
+        return ledger.executeTransfer(fromAccount, toAccount, amount);
+    }
 }
 ```
 
-A matching production approval rule blocks the method with
-`AgentApprovalRequiredException`. Use the optional `agentguard-approval` module
-for approval issuance, separate approver checks, and bound execution. The
-annotation does not automatically implement a review UI or approval storage.
-Calls must go through the Spring proxy; self-invocation is not intercepted.
-Use `GuardedToolCallback` for the Spring AI execution boundary.
+A matching production approval rule blocks the method by throwing `AgentApprovalRequiredException`. Use the optional `agentguard-approval` module for ticket creation, approver checks, and cryptographic argument binding. Calls must go through the Spring proxy; self-invocation is not intercepted. Use `GuardedToolCallback` for Spring AI and MCP tools.
+
+---
+
+### 4. Configuration Properties
 
 ```yaml
 agentguard:
   policy-location: classpath:agentguard-policy.yaml
   audit:
     enabled: true
-    mask-token: "[HIDDEN]"
-    sensitive-keys: [customerEmail, internalNote]
+    mask-token: "[REDACTED]"
+    sensitive-keys: [routingNumber, accountSecret, iban, taxId, clientSecret]
     failure-mode: FAIL_CLOSED
 ```
 
-The default JSON audit logger is `io.agentguard.audit.json`. It records a SHA-256
-arguments fingerprint, delegation chain, policy version/hash, risk and trace ID;
-it does not emit raw arguments. Authorization and execution outcomes are separate,
-correlated events. `BEST_EFFORT` is available when continuing after an audit sink
-failure is an explicit application decision. Post-execution logging failure may
-occur after side effects; applications still need idempotency.
+The default JSON audit logger is `io.agentguard.audit.json`. It records a SHA-256 arguments fingerprint, delegation chain, policy version/hash, risk and trace ID; it never emits raw arguments. Authorization and execution outcomes are separate, correlated events. `BEST_EFFORT` is available when continuing after an audit sink failure is an explicit application decision. Post-execution logging failure may occur after side effects; applications still need idempotency.
 
 ## Modules
 

@@ -12,22 +12,15 @@ may not need another policy engine.
 
 ## The problem it addresses
 
-Consider an agent connected to an order-management MCP server. The same
-authenticated connection can request three very different operations:
+Consider an AI agent connected to a core banking and payments MCP server or financial API. The same authenticated connection can request three fundamentally different operations:
 
-1. Read a development order: allow it.
-2. Read a production order as a developer: deny it.
-3. Refund a production order as an operator: require an authorized human to
-   approve that exact request before execution.
+1. **Query an account balance in sandbox/development**: allow it immediately (`ALLOW`, Risk: LOW).
+2. **Execute an unprivileged wire transfer or disburse corporate treasury**: deny it fail-closed (`DENY`).
+3. **Initiate a $50,000 corporate payment or release escrow funds in production**: require an authorized human compliance officer or CFO to approve that exact request before execution (`APPROVAL_REQUIRED`, Risk: HIGH).
 
-The application needs to resolve the actual resource and environment, evaluate
-permissions, stop execution when necessary, bind any approval to the request,
-and retain useful evidence without recording passwords or tokens. Reimplementing
-that sequence separately in every tool makes behavior harder to review and test.
+The application must resolve the target account, currency, environment, and transaction limits, evaluate declarative policies, halt execution before funds move, cryptographically bind any approval to the exact transaction arguments (account IDs, amounts, currencies), and retain tamper-evident audit records without leaking bank secrets, routing tokens, or tax IDs. Reimplementing that sequence ad-hoc inside every banking tool makes safety impossible to audit and easily bypassed.
 
-AgentGuard provides those building blocks. The model proposes arguments; trusted
-application code owns authentication, resource lookup, policy, and execution.
-It does not ask a model to decide whether its own operation is safe.
+AgentGuard provides those deterministic building blocks. The AI model or autonomous agent proposes arguments; trusted banking application code owns authentication, account resolution, policy evaluation, and execution. It never asks an LLM to decide whether moving money is safe.
 
 ## How this differs from Spring authorization
 
@@ -82,91 +75,51 @@ integrations are separate modules so applications can choose their dependencies.
 
 ## What makes an approval meaningful
 
-An approval must refer to the operation the reviewer actually authorized. The
-approval module binds a ticket to the requester identity/session,
-action, structured arguments, resource, environment, and content-based policy
-revision. Tickets expire. The approver must have
-`agentguard.approval.approve` permission and cannot approve their own request.
+An approval must refer to the operation the reviewer actually authorized. In banking and financial transactions, if a compliance officer or CFO approves transferring $5,000 to Supplier A, an LLM hallucination or prompt injection must never be allowed to change that amount to $50,000 or reroute it to an attacker's IBAN.
 
-Before execution, AgentGuard snapshots the proposed arguments, re-evaluates
-current policy, verifies the binding and expiry, and atomically consumes the
-ticket. The operation receives the verified immutable argument snapshot.
-Changing the order, amount, actor, or policy requires a new approval.
+The approval module binds an `ApprovalTicket` to the requester identity/session, action, structured parameters (via canonical SHA-256 arguments hash), target account/resource, environment, and content-based policy revision. Tickets expire. The approver must have `agentguard.approval.approve` permission and cannot approve their own request.
 
-This provides at-most-once admission through the approval service. It does not
-promise exactly-once external side effects. If the process crashes after consuming
-a ticket, or the business operation fails, applications must reconcile the result
-and use business idempotency/transactions where needed. The in-memory
-store is single-process; clustered deployments use `PostgresApprovalStore` for atomic row-level locking.
+Before execution, AgentGuard snapshots the proposed arguments, re-evaluates current policy, verifies the argument hash binding and expiry, and atomically consumes the ticket. The operation receives the verified immutable argument snapshot. Changing the destination account, payment amount, currency, actor, or policy immediately fails validation and halts execution.
+
+This provides at-most-once admission through the approval service. It does not promise exactly-once external side effects. If the process crashes after consuming a ticket, or the banking operation fails, applications must reconcile the result and use business idempotency/transactions where needed. The in-memory store is single-process; clustered deployments use `PostgresApprovalStore` for atomic row-level locking.
 
 ## What an audit record proves
 
-An AUTHORIZATION record captures a policy decision. EXECUTION_SUCCEEDED means
-the wrapped operation returned normally; EXECUTION_FAILED means it threw. Neither
-event alone proves that a remote system committed a transaction. Correlation IDs
-connect the records, and policy fingerprints identify the evaluated rules.
+An AUTHORIZATION record captures a policy decision. EXECUTION_SUCCEEDED means the wrapped operation returned normally; EXECUTION_FAILED means it threw. Neither event alone proves that a remote core banking ledger committed a transaction. Correlation IDs connect the records, and policy fingerprints identify the evaluated rules.
 
-Sanitization runs before publishers receive standard audit events. The reusable
-JSON publisher also sanitizes at its own boundary. Applications can add sensitive
-keys or use `@Sensitive` on supported DTO accessors/components. Unsupported
-objects and excessive/cyclic traversal are masked rather than rendered blindly.
+Sanitization runs before publishers receive standard audit events. The reusable JSON publisher also sanitizes at its own boundary. Applications configure sensitive keys (`iban`, `routingNumber`, `accountSecret`, `taxId`, `beneficiarySecret`) or use `@Sensitive` on supported DTO accessors/components. Unsupported objects and excessive/cyclic traversal are masked rather than rendered blindly.
 
-This is structured redaction, not a universal secret detector. A secret embedded
-in an ordinary product description is still an ordinary string. Arbitrary HTTP,
-SQL, exception, and third-party logs are outside this pipeline. Choose what data
-to log and configure other logging systems independently.
+This is structured redaction, not a universal secret detector. A secret embedded in an ordinary payment memo or transaction description is still an ordinary string. Arbitrary HTTP, SQL, exception, and third-party logs are outside this pipeline. Choose what data to log and configure other logging systems independently.
 
 ## When to use it
 
-AgentGuard fits a Java/Spring team that exposes agent-callable operations and
-wants consistent policy decisions, approval semantics and sanitized audit output
-without writing the integration for every tool. The examples are useful starting
-points for internal database assistants, infrastructure tools and support agents.
+AgentGuard fits a Java/Spring team that exposes agent-callable operations and wants consistent policy decisions, approval semantics and sanitized audit output without writing the integration for every tool. The examples are useful starting points for financial transaction bots, payment gateways, treasury automation, and internal banking assistants.
 
-It may add unnecessary complexity when normal endpoint/method authorization is
-sufficient. A team already using a mature central policy service may prefer to
-keep that decision engine and implement the `PolicyEngine` interface, subject to
-the revision contract required for approvals.
+It may add unnecessary complexity when normal endpoint/method authorization is sufficient. A team already using a mature central policy service may prefer to keep that decision engine and implement the `PolicyEngine` interface, subject to the revision contract required for approvals.
 
-OPA and Cedar are established general-purpose policy systems. For example,
-[Cedar documents default denial and forbid-overrides-permit](https://docs.cedarpolicy.com/auth/authorization.html).
-AgentGuard's intended distinction is the Java tool-execution integration and the
-combination of request-bound approvals and audit lifecycle, rather than a claim
-that role checks or deny precedence are new.
+OPA and Cedar are established general-purpose policy systems. For example, [Cedar documents default denial and forbid-overrides-permit](https://docs.cedarpolicy.com/auth/authorization.html). AgentGuard's intended distinction is the Java tool-execution integration and the combination of request-bound approvals and audit lifecycle, rather than a claim that role checks or deny precedence are new.
 
 ## How it can contribute as agents become more capable
 
-As applications expose more consequential tools, they need reviewable contracts
-between a proposed operation and an authorized execution. AgentGuard's interfaces
-give teams a place to implement that contract consistently across tools and
-services, with tests that exercise failures as well as successful calls.
+As applications expose more consequential tools, they need reviewable contracts between a proposed operation and an authorized execution. AgentGuard's interfaces give teams a place to implement that contract consistently across tools and services, with tests that exercise failures as well as successful calls.
 
-The implemented modules provide a base for these **future directions**, which
-are not current guarantees:
+The implemented modules provide a base for these **future directions**, which are not current guarantees:
 
 - Administrative approval review web dashboards, retention cleanup jobs, and tenant isolation policies.
 - External policy-engine adapters and safe policy rollout/version management.
 - OpenTelemetry exporters and integrations with existing audit retention systems.
-- Additional provider-specific adapters and revocation hooks for Keycloak,
-  Entra and SPIFFE deployments; the current verified-claims SPI is provider-neutral.
-- Broader framework/version compatibility, distributed execution scenarios and
-  independent security review.
+- Additional provider-specific adapters and revocation hooks for Keycloak, Entra and SPIFFE deployments; the current verified-claims SPI is provider-neutral.
+- Broader framework/version compatibility, distributed execution scenarios and independent security review.
 
-There is no built-in dynamic risk-scoring model, prompt-injection detector,
-universal agent sandbox, or non-Java policy runtime. The HTTP API allows other
-languages to call the Java decision service. Preventing an unauthorized tool action
-does not prevent every malicious action an already authorized tool could perform.
+There is no built-in dynamic risk-scoring model, prompt-injection detector, universal agent sandbox, or non-Java policy runtime. The HTTP API allows other languages to call the Java decision service. Preventing an unauthorized tool action does not prevent every malicious action an already authorized tool could perform.
 
 ## Try the evidence
 
-- [H2 browser app](agentguard-examples/h2-orders-app/README.md): published release,
-  real SQL, multiple users, approval queue and sanitized audit inspection.
-- [Spring AI/MCP app](agentguard-examples/spring-ai-mcp-server/README.md): Spring AI integration,
-  authenticated Streamable HTTP, real tool calls and reusable approvals.
-- [Policy scenarios](specification/examples/policy-scenarios.json): runnable
-  expected decisions, including an unprivileged caller denied approval eligibility.
-- [Benchmarks](benchmarks/README.md): reproducible JMH workload and reporting
-  instructions; performance results are workload-specific, not a security proof.
+- [Enterprise Fintech & Banking MCP Server](agentguard-examples/fintech-banking-mcp-server/README.md): end-to-end financial showcase demonstrating wire payments with threshold governance, corporate B2B payroll delegation, escrow milestone dispute holds, virtual account issuance, and prompt-injection defense against wildcard API scopes.
+- [H2 browser app](agentguard-examples/h2-orders-app/README.md): published release, real SQL, multiple users, approval queue and sanitized audit inspection.
+- [Spring AI/MCP app](agentguard-examples/spring-ai-mcp-server/README.md): Spring AI integration, authenticated Streamable HTTP, real tool calls and reusable approvals.
+- [Policy scenarios](specification/examples/policy-scenarios.json): runnable expected decisions, including an unprivileged caller denied approval eligibility.
+- [Benchmarks](benchmarks/README.md): reproducible JMH workload and reporting instructions; performance results are workload-specific, not a security proof.
 - [Security policy](SECURITY.md): enforcement boundaries and private reporting.
 
 The standard for this project is small, explicit guarantees backed by executable

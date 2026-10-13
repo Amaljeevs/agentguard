@@ -53,14 +53,14 @@ Permissions are hierarchical dot-separated strings evaluated by `PermissionMatch
 
 | Granted Pattern | Requested Action | Match Result | Explanation |
 | :--- | :--- | :--- | :--- |
-| `*` | `anything.nested.here` | **MATCH** | Universal wildcard matches all operations. |
-| `database.query` | `database.query` | **MATCH** | Exact match. |
-| `database.query` | `database.drop` | **NO MATCH** | Action mismatch. |
-| `database.*` | `database.query` | **MATCH** | Prefix wildcard matches any child operation. |
-| `database.*` | `database.schema.migrate` | **MATCH** | Prefix wildcard matches multi-level subpaths. |
-| `*.read` | `logs.read` | **MATCH** | Suffix wildcard matches any resource read operation. |
-| `*.read` | `git.read` | **MATCH** | Suffix wildcard. |
-| `*.read` | `git.write` | **NO MATCH** | Operation does not end with `.read`. |
+| `*` | `payments.transfer` | **MATCH** | Universal wildcard matches all operations. |
+| `payments.transfer` | `payments.transfer` | **MATCH** | Exact match. |
+| `payments.transfer` | `payments.refund` | **NO MATCH** | Action mismatch. |
+| `payments.*` | `payments.transfer` | **MATCH** | Prefix wildcard matches any child payment operation. |
+| `b2b.*` | `b2b.payroll.disburse` | **MATCH** | Prefix wildcard matches multi-level subpaths. |
+| `*.read` | `accounts.read` | **MATCH** | Suffix wildcard matches any resource read operation. |
+| `*.read` | `balance.read` | **MATCH** | Suffix wildcard. |
+| `*.read` | `payments.transfer` | **NO MATCH** | Operation does not end with `.read`. |
 
 ---
 
