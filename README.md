@@ -20,26 +20,48 @@ See [CHANGELOG.md](CHANGELOG.md) for behavior changes and 1.0.0 production stabi
 
 ### Understand AgentGuard in 30 Seconds
 
-1. **Who calls?** Upstream authentication (OAuth2 / OIDC / mTLS / SPIFFE / Spring Security) validates credentials and supplies trusted claims.
-2. **What is proposed?** An AI agent, LLM tool, or MCP client requests an action (e.g., `kubernetes.deploy` or `database.query`) with specific arguments.
-3. **Who decides?** AgentGuard evaluates the request against deterministic, declarative policies without letting the LLM decide its own safety.
-4. **What happens?**
-   - **`ALLOW`**: The tool executes immediately.
-   - **`DENY`**: Execution halts fail-closed with clear decision reason, matched policy, and risk metadata.
-   - **`APPROVAL_REQUIRED`**: Generates a cryptographic SHA-256 request binding (`ApprovalTicket`) requiring human sign-off before single-use execution.
-5. **What is recorded?** Parameter-sanitized audit trails record argument hashes, delegation chains, policy revisions, and trace IDs without leaking secrets.
+```text
+Identity Provider (OAuth2 / OIDC / mTLS / SPIFFE)
+                  │
+                  ▼
+          Verified Identity (sub, roles, scopes, tenant, delegation)
+                  │
+  [Model Intent] (Agent proposes tool call & parameters)
+                  │
+                  ▼
+       AgentGuard Decision Point (Deterministic Policy Engine)
+                  │
+     ┌────────────┼────────────┐
+     ▼            ▼            ▼
+   ALLOW         DENY   APPROVAL_REQUIRED
+     │            │            │
+     │            ▼            ▼
+     │       Fail-Closed  Human Sign-off (Bound to exact canonical arguments)
+     │                         │
+     └────────────┬────────────┘
+                  ▼
+   Guarded Tool / API Execution (Application Authority)
+                  │
+                  ▼
+        Sanitized Audit Trail (Redacted secrets, hashes, trace IDs)
+```
 
----
+#### What AgentGuard Does
+* **Prevents tool execution** when deterministic authorization denies it (fail-closed, deny-by-default).
+* **Binds human approval to an exact request** using canonical SHA-256 argument fingerprinting (`ApprovalTicket`).
+* **Detects modification of approved requests**, preventing parameter tampering between review and execution.
+* **Enforces delegation constraints** ensuring child authority is a strict subset of parent authority (`child ⊆ parent`), detecting cycles, enforcing max depth, and isolating tenants.
+* **Generates sanitized audit evidence** with policy revision hashes, correlation IDs, and automated secret redaction.
+* **Complements upstream security** by integrating with OAuth2, OIDC, Spring Security, Microsoft Entra ID, Keycloak, and SPIFFE.
 
-### When should I use AgentGuard?
+#### What AgentGuard Does NOT Do
+* **Does NOT defeat or detect prompt injection**: AgentGuard does not inspect or classify prompt text or LLM outputs.
+* **Does NOT provide complete AI security or sandboxing**: It is an authorization and governance library, not an OS sandbox or container runtime.
+* **Does NOT replace authentication**: Upstream identity providers must validate credentials and issue verified claims before AgentGuard evaluates policies.
+* **Does NOT claim universal non-bypassability**: Unproxied methods or unguarded tool registrations can bypass enforcement; always register guarded callbacks.
 
-Use AgentGuard when:
-- **You build autonomous AI agents or tool-calling systems** that interact with production APIs, databases, cloud infrastructure, or financial transactions.
-- **You need deterministic security invariants**: RBAC permissions and safety rules must be enforced by application code, never by prompt engineering or LLM self-policing.
-- **You need action-bound human approvals**: Critical actions must be cryptographically bound to exact canonical arguments, policy versions, and expiration timestamps, preventing argument tampering or replay attacks.
-- **You have agent delegation hierarchies**: Child agents execute tasks on behalf of parent agents, requiring strict containment (`child permissions ⊆ parent permissions`), cycle detection, and max depth limits.
-- **You need compliance & forensic audit trails**: Every decision must be traceable with policy versions and correlation IDs, while sensitive data (tokens, passwords, PII) is automatically redacted.
-- **You need polyglot or MCP support**: Intercept Spring AI tools, MCP protocol servers, Spring AOP services, or non-Java agents via `POST /v1/authorize`.
+> [!IMPORTANT]
+> **Model Intent vs. Application Authority**: An LLM or autonomous agent proposes tool calls and parameters (untrusted *model intent*). The host application, backed by trusted identity and AgentGuard, evaluates and enforces permissions (trusted *application authority*). Safety rules are deterministic code invariants—never prompt-engineered suggestions.
 
 ---
 
@@ -178,13 +200,54 @@ role/direct permission must grant the action before a matching approval rule can
 return APPROVAL_REQUIRED. Otherwise the result is DENY. For delegation, the
 request must be eligible for both child and every trusted ancestor. The child's
 complete effective permission set must also be a conservative subset of its
-parent's authority. Unknown parents, inconsistent chains, privilege expansion,
-cycles, excessive depth and invalid temporal bounds deny.
+parent's authority (`child ⊆ parent`). Unknown parents, inconsistent chains, privilege expansion,
+cycles, excessive depth (>16), tenant mismatch, and invalid temporal bounds deny fail-closed.
 
-A configured expression that cannot resolve is denied; it does not silently
-change the environment. Use trusted resource metadata for environments. The
-core evaluator accepts an explicit evaluation timestamp for deterministic tests;
-production callers must supply a trusted current clock.
+### Declarative Conditions and Operators
+
+Rules support deterministic conditional evaluation over request `arguments`, `subject` attributes, `resource` tags, `tenant`, `environment`, and trusted `context` metadata.
+
+The operator set is intentionally minimal, closed, and deterministic:
+
+| Operator | Semantics |
+| :--- | :--- |
+| `equals` | Strict equality for strings, booleans, and normalized numbers (`10` == `10.0`) |
+| `notEquals` | Inverse of `equals` |
+| `in` | Value is contained within a declared list |
+| `notIn` | Value is absent from a declared list |
+| `exists` | Attribute or argument exists and is non-null (`true` or `false`) |
+| `contains` | Collection contains element, or string contains substring |
+| `greaterThan` | Numeric strict inequality (`>`) |
+| `greaterThanOrEqual` | Numeric inequality (`>=`) |
+| `lessThan` | Numeric strict inequality (`<`) |
+| `lessThanOrEqual` | Numeric inequality (`<=`) |
+
+```yaml
+rules:
+  - id: high-value-transfer
+    effect: APPROVAL_REQUIRED
+    risk: HIGH
+    target:
+      actions:
+        - payments.transfer
+    conditions:
+      arguments:
+        amount:
+          greaterThan: 50000
+      environment:
+        equals: production
+      subject:
+        attributes:
+          department:
+            equals: treasury
+```
+
+### Deterministic Invariants
+- **DENY Precedence**: An explicit DENY rule overrides any ALLOW or APPROVAL_REQUIRED.
+- **Deny-by-Default**: Unmatched actions, unknown agents, missing permissions, or invalid environments evaluate to DENY.
+- **APPROVAL_REQUIRED Restriction**: An approval rule can only gate an action that is otherwise granted by a role or explicit ALLOW rule. It never confers authority by itself.
+- **Fail-Closed Evaluation**: Malformed syntax or unknown condition operators fail at policy parse time (`InvalidPolicyException`). Unresolved or missing condition values fail closed at evaluation time.
+- **Zero Remote Code Execution (RCE)**: Policies are pure declarative data—no SpEL, Groovy, JavaScript, or arbitrary script execution engines are embedded.
 
 See the [policy specification](specification/docs/POLICY_SPECIFICATION.md) and
 [security boundaries](SECURITY.md).
@@ -330,22 +393,97 @@ Ready-to-run examples demonstrating AgentGuard patterns across enterprise domain
   Full-featured Model Context Protocol (MCP) server and multi-channel agent gateway showcasing high-stakes financial operations:
   - **Dedicated `tool` Package**: Clean domain connectors in `io.agentguard.fintech.tool` mapped deterministically to AgentGuard requests.
   - **Multi-Channel Agent Connectivity**: Serves both MCP-native agents (Claude Desktop, Cursor via `/mcp`) and external REST agents/chatbots (Slack, Teams, webhooks via `/api/agent/channel/invoke`) through the exact same governance rules.
-  - **Payments & Wire Transfers**: Domestic & cross-border transfers with amount threshold governance. Canonical SHA-256 argument hashing strictly defeats LLM prompt injection and parameter tampering (e.g., silently altering payout amounts).
+  - **Payments & Wire Transfers**: Domestic & cross-border transfers with amount threshold governance. Canonical SHA-256 argument hashing detects parameter modification and prevents argument tampering between review and execution.
   - **B2B Corporate Disbursements**: Batch payroll and vendor payouts with cryptographic delegation chains (`CFO -> Payroll Bot`) and dual executive signoff.
   - **Escrow Contracts & Dispute Freeze**: Milestone-based fund releases with fail-closed state invariants that block automated releases when contracts are flagged as disputed.
-  - **API Management via LLMs**: Prevents prompt injection from generating unauthorized wildcard or admin scopes (`*`), requiring security review for production credentials.
+  - **API Management via LLMs**: Denies unauthorized wildcard or root API scopes (`*`), requiring security review for production credentials.
   - **Virtual Accounts & KYC Tiers**: Tier-based issuance limits (automated for Tier 1; human compliance review for high-volume Tier 3).
-* **[Spring AI MCP Server](agentguard-examples/spring-ai-mcp-server/README.md)**: Real streamable HTTP MCP server integrating Spring AI tools with AgentGuard authorization, audit redaction, and approval lifecycle.
-* **[Python Cross-Language Client](agentguard-examples/cross-language-client/README.md)**: Minimal non-Java client consuming `POST /v1/authorize` with upstream identity injection.
+* **[Spring AI MCP Server](agentguard-examples/spring-ai-mcp-server/README.md)**: Real streamable HTTP MCP server integrating Spring AI tools with AgentGuard authorization, audit redaction, and approval lifecycle. Compatible with Spring AI 1.1.x and modern tool execution lifecycles.
+* **[Cross-Language Clients (Python & TypeScript)](agentguard-examples/cross-language-client/README.md)**: Non-Java clients consuming `POST /v1/authorize` with upstream identity injection.
+
+## Using AgentGuard from other languages
+
+While AgentGuard is natively implemented in Java 21, non-Java applications (Python, TypeScript, Go, Rust) consume the authorization engine as a standalone decision service via the language-neutral HTTP API exposed by `agentguard-spring-web`:
+
+```text
+Python Agent ─────┐
+TypeScript Agent ─┤
+Go Agent ─────────┼── HTTPS ── AgentGuard Authorization Service
+Rust Agent ───────┘                    │
+                                       ▼
+                             Policy / Approval / Audit
+```
+
+### Key Integration Principles
+1. **Model Intent vs. Application Authority**: Untrusted AI agents and LLMs must never invent or supply their own effective identity, roles, or scopes. Effective identity is supplied by trusted authentication middleware (e.g. verified Bearer JWT, mTLS, SPIFFE SVID) extracted at the transport boundary.
+2. **Deterministic Governance**: Client applications submit the proposed action, target resource, raw arguments, and environment context. AgentGuard returns `ALLOW`, `DENY`, or `APPROVAL_REQUIRED`.
+3. **Fail-Closed Execution**: Tools and downstream APIs must only execute when AgentGuard returns an affirmative `ALLOW`.
+4. **Human-in-the-Loop Resumption**: When `APPROVAL_REQUIRED` is returned, execution halts. Human reviewers approve the request-bound ticket via the approval API; the agent may only proceed once an approved ticket is presented and atomically consumed.
+
+### Python Example
+
+```python
+import json, urllib.request
+
+payload = {
+    "action": "kubernetes.deploy",
+    "resource": {"type": "cluster", "id": "prod-east", "tags": {"env": "production"}},
+    "arguments": {"image": "payments-api:v2.4", "replicas": 3},
+    "context": {"environment": "production"}
+}
+
+req = urllib.request.Request(
+    "http://agentguard-service:8080/v1/authorize",
+    data=json.dumps(payload).encode("utf-8"),
+    headers={"Content-Type": "application/json", "Authorization": "Bearer <VERIFIED_ID_TOKEN>"},
+    method="POST"
+)
+
+with urllib.request.urlopen(req) as resp:
+    decision = json.loads(resp.read().decode("utf-8"))
+    if decision["decision"] == "ALLOW":
+        deploy_tool(**payload["arguments"])  # Safe to execute
+    elif decision["decision"] == "APPROVAL_REQUIRED":
+        notify_approvers(decision["approvalRequestId"])
+    else:
+        raise PermissionError(f"Denied: {decision['reason']}")
+```
+
+### TypeScript / Node.js Example
+
+```typescript
+const response = await fetch("http://agentguard-service:8080/v1/authorize", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "Authorization": "Bearer " + verifiedJwtToken
+  },
+  body: JSON.stringify({
+    action: "kubernetes.deploy",
+    resource: { type: "cluster", id: "prod-east", tags: { env: "production" } },
+    arguments: { image: "payments-api:v2.4", replicas: 3 },
+    context: { environment: "production" }
+  })
+});
+
+const decision = await response.json();
+if (decision.decision === "ALLOW") {
+  await executeDeployTool();
+} else if (decision.decision === "APPROVAL_REQUIRED") {
+  pauseWorkflowForApproval(decision.approvalRequestId);
+} else {
+  throw new Error(`Execution blocked: ${decision.reason}`);
+}
+```
 
 ## Durable Approval Store (PostgreSQL)
 
-For clustered environments, `agentguard-approval` provides `PostgresApprovalStore`, a production-grade durable reference implementation backed by standard JDBC `DataSource`.
+For clustered and multi-instance deployments, `agentguard-approval` provides `PostgresApprovalStore`, a production-grade durable reference implementation backed by standard JDBC `DataSource`.
 
-### Features
-- **Atomic Single-Use**: Executes `SELECT ... FOR UPDATE` row-level locking during ticket transitions (`APPROVED -> CONSUMED`), preventing race conditions, concurrent consumption, or replay attacks.
-- **Index-Optimized Schema**: Includes indices on `subject_id`, `state`, and `expires_at` for high-throughput querying.
-- **Schema DDL**: Pre-built migration script available at `schema-postgresql.sql`.
+### Features and Invariants
+- **Atomic Single-Use**: Executes `SELECT ... FOR UPDATE` row-level locking during ticket transitions (`APPROVED -> CONSUMED`), preventing race conditions, concurrent double-execution, or replay attacks across multiple service instances.
+- **Real Database Verification**: Integration-tested against real PostgreSQL via Testcontainers (`PostgresApprovalStoreIntegrationTest`), verifying schema migration, 10-thread concurrent consumption races (where exactly 1 consumer succeeds), transactional rollback, and expiration.
+- **Canonical Schema**: Full DDL schema and indexes are defined in [`schema-postgresql.sql`](agentguard-approval/src/main/resources/schema-postgresql.sql).
 
 ```java
 @Bean
@@ -354,12 +492,13 @@ public ApprovalStore approvalStore(DataSource dataSource) {
 }
 ```
 
+Canonical DDL schema (from [`schema-postgresql.sql`](agentguard-approval/src/main/resources/schema-postgresql.sql)):
+
 ```sql
--- DDL schema in agentguard-approval/src/main/resources/schema-postgresql.sql
 CREATE TABLE IF NOT EXISTS agentguard_approvals (
     id VARCHAR(64) PRIMARY KEY,
     subject_id VARCHAR(128) NOT NULL,
-    action_name VARCHAR(128) NOT NULL,
+    action VARCHAR(255) NOT NULL,
     resource_type VARCHAR(64) NOT NULL,
     resource_id VARCHAR(128) NOT NULL,
     request_hash VARCHAR(128) NOT NULL,
@@ -372,6 +511,10 @@ CREATE TABLE IF NOT EXISTS agentguard_approvals (
     state VARCHAR(32) NOT NULL,
     decided_by VARCHAR(128)
 );
+
+CREATE INDEX IF NOT EXISTS idx_agentguard_approvals_subject ON agentguard_approvals (subject_id);
+CREATE INDEX IF NOT EXISTS idx_agentguard_approvals_state ON agentguard_approvals (state);
+CREATE INDEX IF NOT EXISTS idx_agentguard_approvals_expires_at ON agentguard_approvals (expires_at);
 ```
 
 ## Observability
@@ -440,8 +583,8 @@ are not end-to-end latency guarantees.
 | Integration | Tested baseline |
 | --- | --- |
 | Core, audit, policy, approvals | Java 21 |
-| Spring starter and published consumer examples | Spring Boot 3.3.4 |
-| New Spring AI/MCP example | Spring Boot 3.5.7, Spring AI 1.1.0, MCP Java SDK 0.16.0 |
+| Spring starter and published consumer examples | Spring Boot 3.3.4 / 3.4.x |
+| Spring AI & MCP integration | Spring Boot 3.4+ / 3.5.7, Spring AI 1.1.0 (compatible with 1.x & 2.x tool callbacks), MCP Java SDK 0.16.0 |
 
 Other versions are not claimed compatible until tested. Current audit/approval
 changes are documented breaking behavior changes for consumers of 0.1.0.

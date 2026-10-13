@@ -75,7 +75,7 @@ integrations are separate modules so applications can choose their dependencies.
 
 ## What makes an approval meaningful
 
-An approval must refer to the operation the reviewer actually authorized. In banking and financial transactions, if a compliance officer or CFO approves transferring $5,000 to Supplier A, an LLM hallucination or prompt injection must never be allowed to change that amount to $50,000 or reroute it to an attacker's IBAN.
+An approval must refer to the operation the reviewer actually authorized. In banking and financial transactions, if a compliance officer or CFO approves transferring $5,000 to Supplier A, subsequent request modification—whether caused by model hallucination, parameter tampering, or altered tool calls—must never be allowed to execute with $50,000 or reroute funds to an attacker's IBAN. Canonical SHA-256 argument binding detects any modification and halts execution fail-closed.
 
 The approval module binds an `ApprovalTicket` to the requester identity/session, action, structured parameters (via canonical SHA-256 arguments hash), target account/resource, environment, and content-based policy revision. Tickets expire. The approver must have `agentguard.approval.approve` permission and cannot approve their own request.
 
@@ -115,7 +115,7 @@ There is no built-in dynamic risk-scoring model, prompt-injection detector, univ
 
 ## Try the evidence
 
-- [Enterprise Fintech & Banking MCP Server](agentguard-examples/fintech-banking-mcp-server/README.md): end-to-end financial showcase demonstrating wire payments with threshold governance, corporate B2B payroll delegation, escrow milestone dispute holds, virtual account issuance, and prompt-injection defense against wildcard API scopes.
+- [Enterprise Fintech & Banking MCP Server](agentguard-examples/fintech-banking-mcp-server/README.md): end-to-end financial showcase demonstrating wire payments with threshold governance, corporate B2B payroll delegation, escrow milestone dispute holds, virtual account issuance, and deterministic denial of unauthorized wildcard API scopes.
 - [H2 browser app](agentguard-examples/h2-orders-app/README.md): published release, real SQL, multiple users, approval queue and sanitized audit inspection.
 - [Spring AI/MCP app](agentguard-examples/spring-ai-mcp-server/README.md): Spring AI integration, authenticated Streamable HTTP, real tool calls and reusable approvals.
 - [Policy scenarios](specification/examples/policy-scenarios.json): runnable expected decisions, including an unprivileged caller denied approval eligibility.

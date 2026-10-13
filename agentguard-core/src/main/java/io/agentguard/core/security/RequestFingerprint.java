@@ -65,7 +65,11 @@ public final class RequestFingerprint {
         }
         if (value instanceof Boolean bool) { token(digest, "boolean", bool.toString()); return; }
         if (value instanceof Number number) {
-            try { token(digest, "number", new BigDecimal(number.toString()).stripTrailingZeros().toPlainString()); }
+            try {
+                BigDecimal bd = new BigDecimal(number.toString());
+                String normalized = bd.compareTo(BigDecimal.ZERO) == 0 ? "0" : bd.stripTrailingZeros().toPlainString();
+                token(digest, "number", normalized);
+            }
             catch (NumberFormatException invalid) { throw new IllegalArgumentException("Non-finite numbers cannot be fingerprinted"); }
             return;
         }

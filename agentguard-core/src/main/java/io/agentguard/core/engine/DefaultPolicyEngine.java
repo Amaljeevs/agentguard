@@ -117,6 +117,11 @@ public class DefaultPolicyEngine implements PolicyEngine {
             return decision(Decision.DENY, "Delegated identity validity must be within its parent's validity", null,
                 RiskLevel.HIGH, traceId, request.context().timestamp());
         }
+        if (subject.tenantId().isPresent() && parent.get().tenantId().isPresent()
+            && !subject.tenantId().get().equals(parent.get().tenantId().get())) {
+            return decision(Decision.DENY, "Invalid delegation: child tenant does not match parent tenant", null,
+                RiskLevel.HIGH, traceId, request.context().timestamp());
+        }
         List<String> parentChain = expectedChain.subList(0, expectedChain.size() - 1);
         if (!parent.get().delegationChain().equals(parentChain)) {
             return decision(Decision.DENY, "Invalid delegation: verified ancestry does not match claimed chain", null,
@@ -245,6 +250,14 @@ public class DefaultPolicyEngine implements PolicyEngine {
             boolean matchesEnv = rule.environments().stream()
                 .anyMatch(env -> env.equalsIgnoreCase(context.environment()));
             if (!matchesEnv) {
+                return false;
+            }
+        }
+
+        // Contextual conditions match (arguments, attributes, tags, tenant, environment, context)
+        if (rule.conditions().isPresent() && !rule.conditions().get().isEmpty()) {
+            AuthorizationRequest req = AuthorizationRequest.of(subject, action, resource, context);
+            if (!rule.conditions().get().matches(req)) {
                 return false;
             }
         }

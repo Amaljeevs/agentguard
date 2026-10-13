@@ -6,13 +6,13 @@ This example demonstrates how **AgentGuard** provides deterministic authorizatio
 
 ## 🏛️ Why AgentGuard for Fintech & Banking?
 
-Autonomous AI agents and LLM tool-calling introduce catastrophic risks in financial systems if connected directly to banking APIs:
-* **Prompt Injection & Parameter Tampering**: An attacker or compromised tool output instructs the LLM to modify payment amounts (e.g. from \$100 to \$1,000,000) or alter beneficiary IBANs.
-* **Privilege Escalation**: An LLM agent generates wildcard API scopes (`*` or `admin:*`) or bypasses tiered transaction limits.
+Autonomous AI agents and LLM tool-calling introduce critical operational and safety risks in financial systems if connected directly to banking APIs:
+* **Parameter Tampering & Request Modification**: An agent attempts to execute an operation with altered payment amounts (e.g. from \$100 to \$1,000,000) or modified beneficiary IBANs.
+* **Privilege Escalation**: An agent requests unauthorized wildcard API scopes (`*` or `admin:*`) or attempts to bypass tiered transaction limits.
 * **Delegation Provenance Spoofing**: An autonomous payroll bot claims to act on behalf of the CFO without a verified, unexpired delegation chain.
-* **State Invariants Bypass**: An automated agent releases escrow funds while a contract is legally disputed or under AML freeze.
+* **State Invariants Bypass**: An automated agent requests releasing escrow funds while a contract is legally disputed or under AML freeze.
 
-**AgentGuard eliminates these risks** by enforcing deterministic, code-level governance that is completely decoupled from model nondeterminism and prompt manipulation.
+**AgentGuard enforces deterministic application guardrails** at the tool execution boundary, ensuring safety rules are enforced by code rather than relying on model prompt compliance.
 
 ---
 
@@ -95,12 +95,12 @@ io.agentguard.fintech
 | **Payments** | `transferFunds` | `fintech-bot` | • **Development**: Automatically allowed (`ALLOW`).<br>• **Production**: Requires human authorization (`APPROVAL_REQUIRED`, Risk: HIGH).<br>• **Tampering**: Modifying the amount or recipient post-approval fails cryptographic hash verification. |
 | **B2B Disbursements** | `disburseCorporateBatch` | `payroll-bot` (delegated by `corporate-cfo`) | • Verifies cryptographic delegation chain from executive CFO.<br>• Corporate payroll settlements require executive CFO signoff (`APPROVAL_REQUIRED`, Risk: CRITICAL). |
 | **Escrow Contracts** | `createEscrow`<br>`releaseEscrow`<br>`disputeEscrow` | `fintech-bot` | • Standard escrow creation allowed.<br>• Flagging an escrow as `DISPUTED` immediately freezes releases.<br>• Attempting release on a disputed escrow is deterministically denied (`DENY`, fail-closed). |
-| **API Management** | `createApiClient` | `fintech-bot` | • Creating sandbox read clients is allowed.<br>• Prompt injections requesting wildcard (`*`) or admin scopes are explicitly denied (`DENY`).<br>• Production API clients require Security Officer signoff (`APPROVAL_REQUIRED`). |
+| **API Management** | `createApiClient` | `fintech-bot` | • Creating sandbox read clients is allowed.<br>• Requests specifying wildcard (`*`) or ungranted admin scopes are deterministically denied (`DENY`).<br>• Production API clients require Security Officer signoff (`APPROVAL_REQUIRED`). |
 | **Virtual Accounts** | `issueVirtualAccount` | `fintech-bot` | • Tier 1 low-limit merchant virtual accounts allowed automatically.<br>• Tier 3 high-volume cross-border virtual accounts require Compliance Officer signoff (`APPROVAL_REQUIRED`). |
 
 ---
 
-## 🔒 Cryptographic Defense Against LLM Parameter Tampering
+## 🔒 Cryptographic Defense Against Parameter Tampering and Request Modification
 
 In this example, when a high-value transfer is requested:
 1. AgentGuard computes a **SHA-256 canonical hash** of the request parameters (`fromAccount`, `toAccount`, `amount`, `currency`).

@@ -264,7 +264,7 @@ class FintechBankingMcpTest {
     @DisplayName("API Management governance prevents wildcard scopes and enforces production review")
     void apiManagementGovernanceBlocksWildcardScopes() {
         try (var client = createMcpClient("fintech-bot")) {
-            // 1. Prompt injection / attacker attempting wildcard root API credentials
+            // 1. Attacker or rogue tool call attempting unauthorized wildcard root API credentials
             var wildcardAttempt = client.callTool(new McpSchema.CallToolRequest(
                 "createApiClient",
                 Map.of(

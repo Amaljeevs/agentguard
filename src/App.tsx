@@ -1036,7 +1036,7 @@ rules:
                 Target Architecture & Zero-Trust Threat Model
               </h2>
               <p className="text-xs text-slate-400 mt-1">
-                How AgentGuard isolates agent authority, enforces invariants, and prevents prompt injection privilege escalation.
+                How AgentGuard isolates agent authority, enforces invariants, and prevents unauthorized tool execution.
               </p>
             </div>
 
@@ -1103,7 +1103,7 @@ rules:
                       <td className="py-3 px-3 font-mono text-indigo-400 font-bold">TM-01</td>
                       <td className="py-3 px-3 font-semibold text-white">Confused Deputy / Prompt Hijack</td>
                       <td className="py-3 px-3 text-slate-400">Untrusted prompt induces agent to call destructive tool.</td>
-                      <td className="py-3 px-3 text-emerald-300">Non-bypassable PDP. LLM prompts never make security decisions.</td>
+                      <td className="py-3 px-3 text-emerald-300">Deterministic PDP. LLM prompts never make security decisions.</td>
                     </tr>
                     <tr>
                       <td className="py-3 px-3 font-mono text-indigo-400 font-bold">TM-02</td>

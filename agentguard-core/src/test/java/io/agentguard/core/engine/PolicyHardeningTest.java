@@ -85,4 +85,17 @@ class PolicyHardeningTest {
         assertThat(engine.evaluate(request).policyHash()).contains(engine.revision());
         assertThat(engine.evaluate(request).riskLevel()).isEqualTo(RiskLevel.HIGH);
     }
+
+    @Test void crossTenantDelegationIsDenied() {
+        var parent = AgentIdentity.builder().agentId("parent").permission("orders.*")
+            .issuedAt(now.minusSeconds(60)).expiresAt(now.plusSeconds(60))
+            .attributes(Map.of("tenant", "tenant-alpha")).build();
+        var child = AgentIdentity.builder().agentId("child").delegatedBy("parent").permission("orders.refund")
+            .issuedAt(now.minusSeconds(60)).expiresAt(now.plusSeconds(60))
+            .attributes(Map.of("tenant", "tenant-beta")).build();
+        var engine = new DefaultPolicyEngine(policy(), new DefaultPermissionMatcher(), id -> Optional.of(parent));
+        var decision = engine.evaluate(request(child));
+        assertThat(decision.isDenied()).isTrue();
+        assertThat(decision.reason()).contains("child tenant does not match parent tenant");
+    }
 }

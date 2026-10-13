@@ -50,7 +50,7 @@ rules:
   - id: deny-wildcard-scopes
     effect: DENY
     risk: CRITICAL
-    description: "Prevent LLM prompt injection from generating unauthorized wildcard or root API scopes"
+    description: "Deny unauthorized wildcard or root API scopes without explicit authorization"
     target:
       actions:
         - apimgmt.wildcard

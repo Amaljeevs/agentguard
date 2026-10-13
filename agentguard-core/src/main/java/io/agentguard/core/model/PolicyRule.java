@@ -1,5 +1,7 @@
 package io.agentguard.core.model;
 
+import io.agentguard.core.model.condition.RuleConditions;
+
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -17,14 +19,24 @@ public record PolicyRule(
     Optional<String> resourceType,
     Optional<String> resourceId,
     Set<String> environments,
-    RiskLevel risk
-    ) {
+    RiskLevel risk,
+    Optional<RuleConditions> conditions
+) {
     public PolicyRule(String id, Optional<String> description, RuleEffect effect, Set<String> targetRoles,
                       Set<String> targetActions, Optional<String> resourceType, Optional<String> resourceId,
                       Set<String> environments) {
         this(id, description, effect, targetRoles, targetActions, resourceType, resourceId, environments,
-            effect == RuleEffect.APPROVAL_REQUIRED ? RiskLevel.HIGH : effect == RuleEffect.DENY ? RiskLevel.MEDIUM : RiskLevel.LOW);
+            effect == RuleEffect.APPROVAL_REQUIRED ? RiskLevel.HIGH : effect == RuleEffect.DENY ? RiskLevel.MEDIUM : RiskLevel.LOW,
+            Optional.empty());
     }
+
+    public PolicyRule(String id, Optional<String> description, RuleEffect effect, Set<String> targetRoles,
+                      Set<String> targetActions, Optional<String> resourceType, Optional<String> resourceId,
+                      Set<String> environments, RiskLevel risk) {
+        this(id, description, effect, targetRoles, targetActions, resourceType, resourceId, environments, risk,
+            Optional.empty());
+    }
+
     public PolicyRule {
         if (id == null || id.isBlank()) throw new IllegalArgumentException("Rule id must not be blank");
         Objects.requireNonNull(effect, "Rule effect must not be null");
@@ -35,6 +47,7 @@ public record PolicyRule(
         resourceId = resourceId == null ? Optional.empty() : resourceId;
         environments = environments == null ? Set.of() : Set.copyOf(environments);
         risk = risk == null ? defaultRisk(effect) : risk;
+        conditions = conditions == null ? Optional.empty() : conditions;
     }
 
     private static RiskLevel defaultRisk(RuleEffect effect) {
@@ -56,6 +69,7 @@ public record PolicyRule(
         private String resourceId;
         private Set<String> environments = Set.of();
         private RiskLevel risk;
+        private RuleConditions conditions;
 
         public Builder(String id, RuleEffect effect) {
             this.id = id;
@@ -97,6 +111,11 @@ public record PolicyRule(
             return this;
         }
 
+        public Builder conditions(RuleConditions conditions) {
+            this.conditions = conditions;
+            return this;
+        }
+
         public PolicyRule build() {
             return new PolicyRule(
                 id,
@@ -107,7 +126,8 @@ public record PolicyRule(
                 Optional.ofNullable(resourceType),
                 Optional.ofNullable(resourceId),
                 environments,
-                risk == null ? defaultRisk(effect) : risk
+                risk == null ? defaultRisk(effect) : risk,
+                Optional.ofNullable(conditions)
             );
         }
     }

@@ -21,20 +21,33 @@ We will coordinate investigation, fixes, and disclosure with the reporter.
 See [CHANGELOG.md](CHANGELOG.md) for version-specific changes. No independent
 security audit or universal non-bypassability guarantee is claimed.
 
-## Trust boundary
+## Trust boundary and architecture flow
 
-Authenticate callers before constructing AgentIdentity. Identity roles,
-permissions, delegation parents, resource environments and policy files must come
-from trusted application sources, not model output or unverified request fields.
-The core evaluator consumes a trusted evaluation timestamp; production callers
-must not let clients choose that clock. Spring Security remains responsible for
-credentials, session/token validity, CSRF, and endpoint authorization.
+AgentGuard enforces deterministic policy decisions at application execution boundaries. It operates strictly within this trust chain:
 
-Protect every business execution path. Spring AOP only intercepts calls through
-its proxies; self-invocation, unproxied instances and separately exposed raw tool
-callbacks can bypass that integration. Register only guarded Spring AI callbacks.
-The library is not an operating-system sandbox and cannot constrain arbitrary
-code outside its guarded execution path.
+```text
+Identity provider (OAuth2/OIDC/Entra/Keycloak/SPIFFE)
+  → Verified identity (VerifiedClaims: sub, roles, scopes, tenant, delegation)
+    → AgentGuard (deterministic policy evaluation & exact-request binding)
+      → Policy decision (ALLOW / DENY / APPROVAL_REQUIRED)
+        → Guarded tool / API execution
+```
+
+### Model Intent vs. Application Authority
+- **Model Intent**: An autonomous agent or LLM proposes a tool name and arguments. This proposal is untrusted model intent.
+- **Application Authority**: The host application authenticates the caller, resolves verified claims into an immutable `AgentIdentity`, and presents the request to AgentGuard.
+- AgentGuard never evaluates prompt text, does not detect or classify prompt injection, and does not let LLMs decide their own authorization.
+- Regardless of why an action was proposed (legitimate agent reasoning, model hallucination, or adversarial prompt manipulation), AgentGuard deterministically enforces application safety rules before tool execution.
+
+### Precise Security Invariants
+AgentGuard:
+- **Prevents tool execution** when deterministic authorization denies it (fail-closed, deny-by-default).
+- **Binds human approval to an exact request** using canonical SHA-256 argument fingerprinting (`ApprovalTicket`).
+- **Detects modification of an approved request** before single-use execution, halting execution if arguments, actor, or policy changed.
+- **Enforces delegation constraints** ensuring child authority is a strict subset of parent authority (`child ⊆ parent`), detecting cycles, enforcing max depth limits, and enforcing tenant isolation.
+- **Generates sanitized authorization/audit evidence** without leaking sensitive credentials or argument secrets.
+- **Complements upstream security**: Designed to work with OAuth2, OIDC, Spring Security, Microsoft Entra ID, Keycloak, and SPIFFE rather than replacing authentication or IAM.
+- **Does not sandbox arbitrary OS code**: It intercepts execution through its proxies and guarded tool callbacks; unproxied calls or self-invocation bypass aspect boundaries. Register only guarded tool callbacks.
 
 ## Policy enforcement invariants
 

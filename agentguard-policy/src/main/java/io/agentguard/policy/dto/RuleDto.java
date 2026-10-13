@@ -6,7 +6,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 /**
  * DTO representing an individual rule item in the rules array.
  */
-@JsonIgnoreProperties(ignoreUnknown = false)
+@JsonIgnoreProperties(ignoreUnknown = true)
 public record RuleDto(
     @JsonProperty(value = "id", required = true)
     String id,
@@ -21,5 +21,8 @@ public record RuleDto(
     String risk,
 
     @JsonProperty("target")
-    TargetDto target
+    TargetDto target,
+
+    @JsonProperty("conditions")
+    ConditionsDto conditions
 ) {}

@@ -9,6 +9,9 @@ import io.agentguard.core.model.PolicySet;
 import io.agentguard.core.model.RoleDefinition;
 import io.agentguard.core.model.RuleEffect;
 import io.agentguard.core.model.RiskLevel;
+import io.agentguard.core.model.condition.ConditionOperator;
+import io.agentguard.core.model.condition.RuleConditions;
+import io.agentguard.policy.dto.ConditionsDto;
 import io.agentguard.policy.dto.PolicyDocumentDto;
 import io.agentguard.policy.dto.RoleDto;
 import io.agentguard.policy.dto.RuleDto;
@@ -18,6 +21,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -154,6 +158,9 @@ public class YamlPolicyLoader implements PolicyLoader {
                     builder.description(ruleDto.description());
                 }
 
+                Set<String> environments = new HashSet<>();
+                RuleConditions.Builder condBuilder = RuleConditions.builder();
+
                 if (ruleDto.target() != null) {
                     var target = ruleDto.target();
                     if (target.roles() != null && !target.roles().isEmpty()) {
@@ -170,17 +177,22 @@ public class YamlPolicyLoader implements PolicyLoader {
                             builder.resourceId(target.resources().id());
                         }
                     }
-                    if (target.conditions() != null && target.conditions().environment() != null) {
-                        var envCond = target.conditions().environment();
-                        Set<String> envs = new HashSet<>();
-                        if (envCond.equals() != null && !envCond.equals().isBlank()) {
-                            envs.add(envCond.equals());
-                        }
-                        if (envCond.in() != null) {
-                            envs.addAll(envCond.in());
-                        }
-                        builder.environments(envs);
+                    if (target.conditions() != null) {
+                        compileConditions(ruleDto.id(), target.conditions(), environments, condBuilder);
                     }
+                }
+
+                if (ruleDto.conditions() != null) {
+                    compileConditions(ruleDto.id(), ruleDto.conditions(), environments, condBuilder);
+                }
+
+                if (!environments.isEmpty()) {
+                    builder.environments(environments);
+                }
+
+                RuleConditions compiledConditions = condBuilder.build();
+                if (!compiledConditions.isEmpty()) {
+                    builder.conditions(compiledConditions);
                 }
 
                 compiledRules.add(builder.build());
@@ -208,5 +220,172 @@ public class YamlPolicyLoader implements PolicyLoader {
             .roles(compiledRoles)
             .rules(compiledRules)
             .build();
+    }
+
+    private void compileConditions(
+        String ruleId,
+        ConditionsDto conditionsDto,
+        Set<String> environmentsOut,
+        RuleConditions.Builder condBuilder
+    ) throws InvalidPolicyException {
+        if (conditionsDto == null) return;
+
+        // 1. Environment
+        if (conditionsDto.environment() != null) {
+            Object envObj = conditionsDto.environment();
+            if (envObj instanceof Map<?, ?> map) {
+                for (var entry : map.entrySet()) {
+                    String opName = entry.getKey().toString();
+                    ConditionOperator op = ConditionOperator.fromYaml(opName).orElseThrow(() ->
+                        new InvalidPolicyException("Unsupported condition operator: '" + opName + "' on rule '" + ruleId + "'"));
+                    condBuilder.environment(op, entry.getValue());
+                    if (op == ConditionOperator.EQUALS && entry.getValue() != null) {
+                        environmentsOut.add(entry.getValue().toString());
+                    } else if (op == ConditionOperator.IN && entry.getValue() instanceof Collection<?> col) {
+                        for (Object o : col) {
+                            if (o != null) environmentsOut.add(o.toString());
+                        }
+                    }
+                }
+            } else if (envObj instanceof String s) {
+                condBuilder.environment(ConditionOperator.EQUALS, s);
+                environmentsOut.add(s);
+            }
+        }
+
+        // 2. Tenant
+        if (conditionsDto.tenant() != null) {
+            Object tenantObj = conditionsDto.tenant();
+            if (tenantObj instanceof Map<?, ?> map) {
+                for (var entry : map.entrySet()) {
+                    String opName = entry.getKey().toString();
+                    ConditionOperator op = ConditionOperator.fromYaml(opName).orElseThrow(() ->
+                        new InvalidPolicyException("Unsupported condition operator: '" + opName + "' on rule '" + ruleId + "'"));
+                    condBuilder.tenant(op, entry.getValue());
+                }
+            } else if (tenantObj instanceof String s) {
+                condBuilder.tenant(ConditionOperator.EQUALS, s);
+            }
+        }
+
+        // 3. Arguments
+        if (conditionsDto.arguments() != null) {
+            for (var entry : conditionsDto.arguments().entrySet()) {
+                String field = entry.getKey();
+                Object val = entry.getValue();
+                if (val instanceof Map<?, ?> opMap) {
+                    for (var opEntry : opMap.entrySet()) {
+                        String opName = opEntry.getKey().toString();
+                        ConditionOperator op = ConditionOperator.fromYaml(opName).orElseThrow(() ->
+                            new InvalidPolicyException("Unsupported condition operator: '" + opName + "' on rule '" + ruleId + "'"));
+                        condBuilder.argument(field, op, opEntry.getValue());
+                    }
+                } else {
+                    condBuilder.argument(field, ConditionOperator.EQUALS, val);
+                }
+            }
+        }
+
+        // 4. Subject
+        if (conditionsDto.subject() != null) {
+            for (var entry : conditionsDto.subject().entrySet()) {
+                String key = entry.getKey();
+                Object val = entry.getValue();
+                if ("attributes".equalsIgnoreCase(key) && val instanceof Map<?, ?> attrs) {
+                    for (var attrEntry : attrs.entrySet()) {
+                        String attrName = attrEntry.getKey().toString();
+                        Object attrVal = attrEntry.getValue();
+                        if (attrVal instanceof Map<?, ?> opMap) {
+                            for (var opEntry : opMap.entrySet()) {
+                                String opName = opEntry.getKey().toString();
+                                ConditionOperator op = ConditionOperator.fromYaml(opName).orElseThrow(() ->
+                                    new InvalidPolicyException("Unsupported condition operator: '" + opName + "' on rule '" + ruleId + "'"));
+                                condBuilder.subjectAttribute(attrName, op, opEntry.getValue());
+                            }
+                        } else {
+                            condBuilder.subjectAttribute(attrName, ConditionOperator.EQUALS, attrVal);
+                        }
+                    }
+                } else if (val instanceof Map<?, ?> opMap) {
+                    for (var opEntry : opMap.entrySet()) {
+                        String opName = opEntry.getKey().toString();
+                        ConditionOperator op = ConditionOperator.fromYaml(opName).orElseThrow(() ->
+                            new InvalidPolicyException("Unsupported condition operator: '" + opName + "' on rule '" + ruleId + "'"));
+                        condBuilder.subjectField(key, op, opEntry.getValue());
+                    }
+                } else {
+                    condBuilder.subjectField(key, ConditionOperator.EQUALS, val);
+                }
+            }
+        }
+
+        // 5. Attributes (top-level under conditions)
+        if (conditionsDto.attributes() != null) {
+            for (var entry : conditionsDto.attributes().entrySet()) {
+                String attrName = entry.getKey();
+                Object val = entry.getValue();
+                if (val instanceof Map<?, ?> opMap) {
+                    for (var opEntry : opMap.entrySet()) {
+                        String opName = opEntry.getKey().toString();
+                        ConditionOperator op = ConditionOperator.fromYaml(opName).orElseThrow(() ->
+                            new InvalidPolicyException("Unsupported condition operator: '" + opName + "' on rule '" + ruleId + "'"));
+                        condBuilder.subjectAttribute(attrName, op, opEntry.getValue());
+                    }
+                } else {
+                    condBuilder.subjectAttribute(attrName, ConditionOperator.EQUALS, val);
+                }
+            }
+        }
+
+        // 6. Resource
+        if (conditionsDto.resource() != null) {
+            for (var entry : conditionsDto.resource().entrySet()) {
+                String key = entry.getKey();
+                Object val = entry.getValue();
+                if (("tags".equalsIgnoreCase(key) || "attributes".equalsIgnoreCase(key)) && val instanceof Map<?, ?> tags) {
+                    for (var tagEntry : tags.entrySet()) {
+                        String tagName = tagEntry.getKey().toString();
+                        Object tagVal = tagEntry.getValue();
+                        if (tagVal instanceof Map<?, ?> opMap) {
+                            for (var opEntry : opMap.entrySet()) {
+                                String opName = opEntry.getKey().toString();
+                                ConditionOperator op = ConditionOperator.fromYaml(opName).orElseThrow(() ->
+                                    new InvalidPolicyException("Unsupported condition operator: '" + opName + "' on rule '" + ruleId + "'"));
+                                condBuilder.resourceTag(tagName, op, opEntry.getValue());
+                            }
+                        } else {
+                            condBuilder.resourceTag(tagName, ConditionOperator.EQUALS, tagVal);
+                        }
+                    }
+                } else if (val instanceof Map<?, ?> opMap) {
+                    for (var opEntry : opMap.entrySet()) {
+                        String opName = opEntry.getKey().toString();
+                        ConditionOperator op = ConditionOperator.fromYaml(opName).orElseThrow(() ->
+                            new InvalidPolicyException("Unsupported condition operator: '" + opName + "' on rule '" + ruleId + "'"));
+                        condBuilder.resourceField(key, op, opEntry.getValue());
+                    }
+                } else {
+                    condBuilder.resourceField(key, ConditionOperator.EQUALS, val);
+                }
+            }
+        }
+
+        // 7. Context
+        if (conditionsDto.context() != null) {
+            for (var entry : conditionsDto.context().entrySet()) {
+                String key = entry.getKey();
+                Object val = entry.getValue();
+                if (val instanceof Map<?, ?> opMap) {
+                    for (var opEntry : opMap.entrySet()) {
+                        String opName = opEntry.getKey().toString();
+                        ConditionOperator op = ConditionOperator.fromYaml(opName).orElseThrow(() ->
+                            new InvalidPolicyException("Unsupported condition operator: '" + opName + "' on rule '" + ruleId + "'"));
+                        condBuilder.context(key, op, opEntry.getValue());
+                    }
+                } else {
+                    condBuilder.context(key, ConditionOperator.EQUALS, val);
+                }
+            }
+        }
     }
 }
