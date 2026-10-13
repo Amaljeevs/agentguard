@@ -15,8 +15,17 @@ target/
 .classpath
 .settings/
 
-# graft's local graph cache — regenerable, not committed (run `graft build`).
+# Local graft files and generated agent context (kept locally, not committed to GitHub)
 /graft/
+.ignore
+.claude/
+.cursor/
+.gemini/
+.mcp.json
+opencode.json
+AGENTS.md
+GEMINI.md
+.github/copilot-instructions.md
 
 # Python
 __pycache__/
