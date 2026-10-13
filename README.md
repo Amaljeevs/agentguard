@@ -1,5 +1,5 @@
 # AgentGuard
-![Uploading AgentGuard_ Secure AI Systems.png…]()
+<img width="2172" height="724" alt="AgentGuard_ Secure AI Systems" src="https://github.com/user-attachments/assets/62c8dbf5-5d59-46a1-a389-c430e220e068" />
 
 **Tool-level authorization, request-bound approvals, and sanitized audit trails for AI agents.**
 
