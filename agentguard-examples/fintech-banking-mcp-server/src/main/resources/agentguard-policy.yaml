@@ -109,3 +109,4 @@ rules:
       conditions:
         environment:
           equals: production-tier3
+

@@ -4,7 +4,7 @@ import io.agentguard.approval.ApprovalService;
 import io.agentguard.approval.ApprovalStore;
 import io.agentguard.approval.ApprovalTicket;
 import io.agentguard.core.exception.AgentAccessDeniedException;
-import io.agentguard.fintech.service.FintechBankingTools;
+import io.agentguard.fintech.tool.FintechBankingTools;
 import io.agentguard.fintech.service.TrustedAgentIdentityRegistry;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -82,3 +82,4 @@ public class FintechApprovalsController {
         return ResponseEntity.badRequest().body(Map.of("error", exception.getMessage()));
     }
 }
+

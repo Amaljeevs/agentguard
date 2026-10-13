@@ -45,3 +45,4 @@ CREATE TABLE api_clients (
     environment VARCHAR(32) NOT NULL,
     status VARCHAR(32) NOT NULL
 );
+

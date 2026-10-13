@@ -10,7 +10,7 @@ import io.agentguard.audit.publisher.*;
 import io.agentguard.audit.sanitizer.ParameterSanitizer;
 import io.agentguard.core.engine.PolicyEngine;
 import io.agentguard.core.model.AgentIdentity;
-import io.agentguard.fintech.service.FintechBankingTools;
+import io.agentguard.fintech.tool.FintechBankingTools;
 import io.agentguard.fintech.service.TrustedAgentIdentityRegistry;
 import io.agentguard.spring.ai.GuardedToolCallback;
 import io.modelcontextprotocol.common.McpTransportContext;
@@ -235,3 +235,4 @@ public class FintechMcpConfiguration {
             .build();
     }
 }
+

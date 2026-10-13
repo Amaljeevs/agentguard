@@ -1,4 +1,4 @@
-package io.agentguard.fintech.service;
+package io.agentguard.fintech.tool;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -16,8 +16,8 @@ import java.math.BigDecimal;
 import java.util.*;
 
 /**
- * Core banking, payments, escrow, B2B corporate disbursements, and API governance tools.
- * All operations map deterministic AgentGuard AuthorizationRequest instances before execution.
+ * Enterprise tool implementations and request mapping connectors.
+ * All tools map deterministic AgentGuard AuthorizationRequest instances before execution.
  */
 @Service
 public class FintechBankingTools {
@@ -120,8 +120,6 @@ public class FintechBankingTools {
         String status = (String) row.get("STATUS");
         String environment = (String) row.get("ENVIRONMENT");
 
-        // If the contract is flagged as DISPUTED, classify the resource type as 'escrow-disputed'
-        // which triggers an explicit fail-closed DENY rule.
         String resourceType = "DISPUTED".equalsIgnoreCase(status) ? "escrow-disputed" : "escrow";
 
         return AuthorizationRequest.of(
@@ -147,7 +145,6 @@ public class FintechBankingTools {
         String scopes = String.valueOf(args.getOrDefault("scopes", ""));
         String environment = String.valueOf(args.getOrDefault("environment", "sandbox"));
 
-        // If the LLM generates wildcard or root-level scopes, route to wildcard action which is explicitly DENIED
         String actionName = (scopes.contains("*") || scopes.toLowerCase().contains("admin"))
             ? "apimgmt.wildcard"
             : "apimgmt.client.create";
@@ -164,7 +161,6 @@ public class FintechBankingTools {
         String virtualIban = requireString(args, "virtualIban");
         String kycTier = String.valueOf(args.getOrDefault("kycTier", "TIER_1"));
 
-        // Tier 3 virtual accounts require AML / KYC review, so we map environment to 'production-tier3'
         String environment = "TIER_3".equalsIgnoreCase(kycTier) ? "production-tier3" : "production";
 
         return AuthorizationRequest.of(

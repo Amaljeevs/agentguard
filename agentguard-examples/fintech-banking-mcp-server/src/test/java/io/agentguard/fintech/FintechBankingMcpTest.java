@@ -87,6 +87,9 @@ class FintechBankingMcpTest {
     @Test
     @DisplayName("Payments in development environment are allowed automatically")
     void paymentsLowValueInDevelopmentAllowedAutomatically() {
+        BigDecimal devBalanceBefore = jdbc.queryForObject(
+            "SELECT balance FROM accounts WHERE id='ACC-DEV-001'", BigDecimal.class
+        );
         try (var client = createMcpClient("fintech-bot")) {
             var result = client.callTool(new McpSchema.CallToolRequest(
                 "transferFunds",
@@ -101,10 +104,10 @@ class FintechBankingMcpTest {
             assertThat(result.isError()).isFalse();
             assertThat(result.content().toString()).contains("TRANSFERRED");
 
-            BigDecimal devBalance = jdbc.queryForObject(
+            BigDecimal devBalanceAfter = jdbc.queryForObject(
                 "SELECT balance FROM accounts WHERE id='ACC-DEV-001'", BigDecimal.class
             );
-            assertThat(devBalance).isEqualByComparingTo("9500.00");
+            assertThat(devBalanceBefore.subtract(devBalanceAfter)).isEqualByComparingTo("500.00");
         }
     }
 
@@ -361,5 +364,82 @@ class FintechBankingMcpTest {
             assertThat(event.traceId()).isNotNull();
             assertThat(event.metadata()).containsKey("phase");
         });
+    }
+
+    @Test
+    @DisplayName("Multi-channel agent controller lists tools for external agents and chatbots")
+    void agentChannelListsToolsOverRest() throws Exception {
+        var response = HttpClient.newHttpClient().send(
+            HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + "/api/agent/tools"))
+                .header("Authorization", basicAuth("fintech-bot"))
+                .GET().build(),
+            HttpResponse.BodyHandlers.ofString()
+        );
+        assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(response.body()).contains("transferFunds", "disburseCorporateBatch", "releaseEscrow");
+    }
+
+    @Test
+    @DisplayName("Multi-channel agent controller executes allowed tool invocations")
+    void agentChannelInvokeExecutesAllowedTool() throws Exception {
+        String payload = """
+            {
+              "tool": "transferFunds",
+              "parameters": {
+                "fromAccount": "ACC-DEV-001",
+                "toAccount": "ACC-DEV-002",
+                "amount": 200.00,
+                "currency": "USD",
+                "purpose": "REST Slack bot payment"
+              },
+              "channel": "SLACK_BOT"
+            }
+            """;
+        var response = httpPost("fintech-bot", "/api/agent/channel/invoke", payload);
+        assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(response.body()).contains("\"status\":\"SUCCESS\"");
+        assertThat(response.body()).contains("TRANSFERRED");
+    }
+
+    @Test
+    @DisplayName("Multi-channel agent controller halts on production actions with APPROVAL_REQUIRED")
+    void agentChannelInvokeHaltsAndReturnsApprovalRequired() throws Exception {
+        String payload = """
+            {
+              "tool": "transferFunds",
+              "parameters": {
+                "fromAccount": "ACC-PROD-001",
+                "toAccount": "ACC-PROD-002",
+                "amount": 7500.00,
+                "currency": "USD",
+                "purpose": "Webhook triggered payment"
+              },
+              "channel": "WEBHOOK"
+            }
+            """;
+        var response = httpPost("fintech-bot", "/api/agent/channel/invoke", payload);
+        assertThat(response.statusCode()).isEqualTo(202);
+        assertThat(response.body()).contains("\"status\":\"APPROVAL_REQUIRED\"");
+        assertThat(response.body()).contains("approvalId");
+    }
+
+    @Test
+    @DisplayName("Multi-channel agent controller rejects denied tools fail-closed with 403")
+    void agentChannelInvokeRejectsDeniedTool() throws Exception {
+        String payload = """
+            {
+              "tool": "createApiClient",
+              "parameters": {
+                "clientId": "MALICIOUS-REST-01",
+                "scopes": "*",
+                "environment": "production"
+              },
+              "channel": "EXTERNAL_AGENT"
+            }
+            """;
+        var response = httpPost("fintech-bot", "/api/agent/channel/invoke", payload);
+        assertThat(response.statusCode()).isEqualTo(403);
+        assertThat(response.body()).contains("\"status\":\"DENIED\"");
+        assertThat(response.body()).contains("deny-wildcard-scopes");
     }
 }

@@ -1,6 +1,6 @@
 # Enterprise Fintech & Banking MCP Server with AgentGuard
 
-This example demonstrates how **AgentGuard** provides deterministic authorization, cryptographic parameter binding, multi-party approvals, and audit governance for **Model Context Protocol (MCP)** servers in high-stakes financial services and banking environments.
+This example demonstrates how **AgentGuard** provides deterministic authorization, cryptographic parameter binding, multi-party approvals, and audit governance for **Model Context Protocol (MCP)** servers and **Multi-Channel Agent Integrations** in high-stakes financial services and banking environments.
 
 ---
 
@@ -16,36 +16,81 @@ Autonomous AI agents and LLM tool-calling introduce catastrophic risks in financ
 
 ---
 
-## ⚙️ Architecture & Financial Workflows
+## ⚙️ Architecture: Multi-Channel Agent Connectivity
+
+Financial institutions operate across multiple client channels simultaneously. This example shows how **MCP clients** and **external agents/chatbots** share the exact same tool definitions, security policies, and approval workflows:
 
 ```mermaid
 flowchart TD
-    Client["AI Agent / LLM Client\n(Transport: MCP Streamable HTTP)"]
-    mTLS["Transport Authentication\n(mTLS / HTTP Basic / OAuth2 JWT)"]
-    IdentityReg["Trusted Identity Registry\n(Resolves Agent & Delegation Chain)"]
-    McpServer["MCP Server (/mcp)\n(GuardedToolCallback)"]
-    PolicyEngine["AgentGuard Policy Engine\n(Deterministic Rules & Risk Levels)"]
-    AppStore["Durable / In-Memory Approval Store\n(SHA-256 Canonical Argument Hash)"]
-    HumanApprover["Human Signer / Compliance Officer\n(REST Approval Endpoint)"]
-    BankLedger[("Core Banking DB / H2\n(Accounts, Escrows, Batches, APIs)")]
+    subgraph Channels["Client & Ingestion Channels"]
+        McpClient["Channel A: MCP Agent Client\n(Claude Desktop / Cursor / MCP CLI)\nEndpoint: /mcp"]
+        RestAgent["Channel B: External Agent / Chatbot\n(LangChain / AutoGen / Slack / Teams)\nEndpoint: /api/agent/channel/invoke"]
+    end
 
-    Client -->|1. Tool Call Request| mTLS
-    mTLS -->|2. Verified Principal| IdentityReg
-    IdentityReg -->|3. AgentIdentity Context| McpServer
-    McpServer -->|4. AuthorizationRequest| PolicyEngine
-    PolicyEngine -->|ALLOW: Low-Value / Sandbox| BankLedger
-    PolicyEngine -->|DENY: Disputed Escrow / Wildcard Scopes| McpServer
+    subgraph Security["Transport & Identity Boundary"]
+        AuthLayer["Authentication Layer\n(mTLS / HTTP Basic / OAuth2 JWT)"]
+        IdentityReg["Trusted Identity Registry\n(Resolves Verified AgentIdentity & Delegation)"]
+    end
+
+    subgraph CoreEngine["AgentGuard Governance & Tool Layer"]
+        McpAdapter["MCP GuardedToolCallback\n(io.agentguard.fintech.config)"]
+        ChannelCtrl["Agent Channel Controller\n(io.agentguard.fintech.controller)"]
+        ToolPackage["Tool Package Connectors\n(io.agentguard.fintech.tool.FintechBankingTools)"]
+        PolicyEngine["Policy Engine\n(agentguard-policy.yaml)"]
+    end
+
+    subgraph Approvals["Human Governance Layer"]
+        AppStore["Approval Store\n(SHA-256 Canonical Argument Hash)"]
+        HumanApprover["Human Signer / Compliance Officer\nEndpoint: /api/approvals/*"]
+    end
+
+    subgraph Ledger["Core Banking Database"]
+        BankDB[("H2 Database\nAccounts, Escrows, Batches, Virtual Accounts, APIs")]
+    end
+
+    McpClient -->|1a. Streamable HTTP| AuthLayer
+    RestAgent -->|1b. REST JSON Invocation| AuthLayer
+    AuthLayer -->|2. Verified Principal| IdentityReg
+    IdentityReg -->|3a. Agent Context| McpAdapter
+    IdentityReg -->|3b. Agent Context| ChannelCtrl
+    McpAdapter --> ToolPackage
+    ChannelCtrl --> ToolPackage
+    ToolPackage -->|4. AuthorizationRequest| PolicyEngine
+
+    PolicyEngine -->|ALLOW: Low-Value / Sandbox| BankDB
+    PolicyEngine -->|DENY: Disputed Escrow / Wildcard Scopes| Security
     PolicyEngine -->|APPROVAL_REQUIRED: High-Value / Prod| AppStore
-    AppStore -.->|5. Review Ticket| HumanApprover
-    HumanApprover -->|6. Approve Exact Hash| AppStore
-    AppStore -->|7. Atomic Single-Use Execution| BankLedger
+
+    AppStore -.->|5. Review Exact Hash| HumanApprover
+    HumanApprover -->|6. Approve / Reject| AppStore
+    AppStore -->|7. Atomic Single-Use Execution| BankDB
+```
+
+---
+
+## 📁 Package & Codebase Structure
+
+The example codebase is organized into clean, dedicated packages:
+
+```
+io.agentguard.fintech
+├── config/
+│   ├── FintechMcpConfiguration.java        # Streamable HTTP MCP server (/mcp) registering GuardedToolCallback
+│   └── FintechSecurityConfiguration.java   # Stateless HTTP Basic security & CSRF exclusions for /mcp and /api/**
+├── controller/
+│   ├── FintechAgentChannelController.java  # Multi-channel agent connectivity (/api/agent/channel/invoke & /api/agent/tools)
+│   └── FintechApprovalsController.java     # Human approval inspection, approval, rejection, and execution API
+├── tool/
+│   └── FintechBankingTools.java            # Dedicated tool package containing all banking operations & request mappings
+└── service/
+    └── TrustedAgentIdentityRegistry.java   # AgentIdentityLookup resolving verified identities & delegation chains
 ```
 
 ---
 
 ## 📦 Financial Use Cases Demonstrated
 
-| Category | Tool | Agent Role | Policy & Governance Behavior |
+| Category | Tool (in `tool` package) | Agent Role | Policy & Governance Behavior |
 | :--- | :--- | :--- | :--- |
 | **Payments** | `transferFunds` | `fintech-bot` | • **Development**: Automatically allowed (`ALLOW`).<br>• **Production**: Requires human authorization (`APPROVAL_REQUIRED`, Risk: HIGH).<br>• **Tampering**: Modifying the amount or recipient post-approval fails cryptographic hash verification. |
 | **B2B Disbursements** | `disburseCorporateBatch` | `payroll-bot` (delegated by `corporate-cfo`) | • Verifies cryptographic delegation chain from executive CFO.<br>• Corporate payroll settlements require executive CFO signoff (`APPROVAL_REQUIRED`, Risk: CRITICAL). |
@@ -78,17 +123,21 @@ In this example, when a high-value transfer is requested:
 mvn -f agentguard-examples/fintech-banking-mcp-server/pom.xml clean verify
 ```
 
-The test suite (`FintechBankingMcpTest`) executes 10 comprehensive end-to-end scenarios covering:
-1. MCP tool discovery over streamable HTTP transport (`/mcp`).
-2. Automatic execution of development-tier payments.
-3. Interception of production payments requiring human approval.
-4. Defense against LLM parameter tampering and replay attacks using canonical argument hashing.
-5. B2B corporate payroll disbursement with CFO delegation chain verification.
-6. Fail-closed dispute holds preventing escrow contract release.
-7. Explicit denial of wildcard/admin API scopes generated by prompt injection.
-8. Regulatory KYC tiering for virtual account issuance.
-9. Rejection of unauthenticated transport calls (401 Unauthorized).
-10. Automatic audit sanitization masking sensitive account and routing parameters.
+The test suite (`FintechBankingMcpTest`) executes 14 comprehensive end-to-end scenarios covering:
+1. **MCP Discovery**: Lists all 7 banking tools over streamable HTTP transport (`/mcp`).
+2. **Auto-Allowed Payments**: Verifies low-value development payments execute and update accounts.
+3. **Production Payments**: Intercepts high-value production transfers with `APPROVAL_REQUIRED`.
+4. **Parameter Tampering Prevention**: Validates that modifying payment amounts after approval is rejected via canonical argument hashing.
+5. **Replay Attack Defense**: Validates single-use consumption semantics.
+6. **B2B Delegation Provenance**: Verifies `payroll-bot` acting on behalf of `corporate-cfo` requires dual executive signoff.
+7. **Escrow Dispute Freeze**: Verifies fail-closed denial of releases on disputed escrow agreements.
+8. **Prompt-Injected API Wildcards**: Verifies explicit denial when an agent attempts to create wildcard (`*`) scopes.
+9. **Production API Governance**: Verifies high-privilege API clients require security officer signoff.
+10. **KYC Tiering**: Verifies Tier 1 virtual accounts are automated while Tier 3 accounts require compliance approval.
+11. **Multi-Channel REST Tool Discovery**: Verifies external agents can discover tools via `GET /api/agent/tools`.
+12. **Multi-Channel REST Tool Execution**: Verifies Slack/chatbot tool invocations execute safely via `POST /api/agent/channel/invoke`.
+13. **Multi-Channel REST Approval Halts**: Verifies webhook invocations halt with `APPROVAL_REQUIRED` and return ticket IDs.
+14. **Audit Sanitization**: Confirms sensitive account secrets and tokens are redacted with `[REDACTED]`.
 
 ---
 
@@ -96,6 +145,7 @@ The test suite (`FintechBankingMcpTest`) executes 10 comprehensive end-to-end sc
 
 * [`agentguard-policy.yaml`](src/main/resources/agentguard-policy.yaml): Declarative financial rules, roles, conditions, and risk thresholds.
 * [`schema.sql`](src/main/resources/schema.sql) & [`data.sql`](src/main/resources/data.sql): Database tables and test seed accounts.
-* [`FintechBankingTools.java`](src/main/java/io/agentguard/fintech/service/FintechBankingTools.java): Financial operations and request mapping.
+* [`FintechBankingTools.java`](src/main/java/io/agentguard/fintech/tool/FintechBankingTools.java): Financial operations in dedicated `tool` package.
 * [`FintechMcpConfiguration.java`](src/main/java/io/agentguard/fintech/config/FintechMcpConfiguration.java): Model Context Protocol server configuration with `GuardedToolCallback`.
+* [`FintechAgentChannelController.java`](src/main/java/io/agentguard/fintech/controller/FintechAgentChannelController.java): REST channel gateway for non-MCP agents and chat platforms.
 * [`FintechApprovalsController.java`](src/main/java/io/agentguard/fintech/controller/FintechApprovalsController.java): REST API for human-in-the-loop approvals.

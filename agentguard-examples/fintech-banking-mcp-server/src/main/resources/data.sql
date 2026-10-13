@@ -21,3 +21,4 @@ INSERT INTO corporate_batches (id, corporate_id, total_amount, currency, recipie
 -- Master virtual account root
 INSERT INTO accounts (id, holder_name, balance, currency, environment, status) VALUES
     ('MASTER-VA-POOL', 'Fintech Virtual Master Settlement', 2500000.00, 'USD', 'production', 'ACTIVE');
+
