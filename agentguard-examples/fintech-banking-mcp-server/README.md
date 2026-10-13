@@ -1,6 +1,6 @@
 # Enterprise Fintech & Banking MCP Server with AgentGuard
 
-This example demonstrates how **AgentGuard** provides deterministic authorization, cryptographic parameter binding, multi-party approvals, and audit governance for **Model Context Protocol (MCP)** servers and **Multi-Channel Agent Integrations** in high-stakes financial services and banking environments.
+This example demonstrates how **AgentGuard** provides deterministic authorization, cryptographic parameter binding, multi-party approvals, and audit governance for **Model Context Protocol (MCP)** servers and **Multi-Channel Agent Integrations** in high-stakes financial services and banking environments. It exercises the current **0.2.1 release** and embodies the reference architecture for the upcoming **1.0.0 production-stable milestone**.
 
 ---
 

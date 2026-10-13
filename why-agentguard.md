@@ -51,9 +51,9 @@ see [Spring AI MCP server documentation](https://docs.spring.io/spring-ai/refere
 
 ## What is implemented
 
-**Release Status:** `0.2.1` is the current published release on Maven Central. See [CHANGELOG.md](CHANGELOG.md) for full version history.
+**Release Status:** `0.2.1` is the current published release on Maven Central. Version `1.0.0` is finalized across documentation and contracts as the upcoming production-stable milestone. See [CHANGELOG.md](CHANGELOG.md) for full version history.
 
-| Capability | Initial 0.1.0 | Current 0.2.1 |
+| Capability | Initial 0.1.0 | Current 0.2.1 (Preparing 1.0.0) |
 | --- | --- | --- |
 | Java 21 core; roles, direct permissions, wildcard matching | Yes | Yes |
 | Environment/resource rules; explicit deny precedence | Yes | Yes |

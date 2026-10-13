@@ -12,9 +12,9 @@
 [![Java](https://img.shields.io/badge/Java-21%2B-orange.svg)](https://openjdk.org/projects/jdk/21/)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
-**Current release: 0.2.1**
+**Current release: 0.2.1** (Published on Maven Central | 1.0.0 planned stable release)
 
-See [CHANGELOG.md](CHANGELOG.md) for behavior changes and migration.
+See [CHANGELOG.md](CHANGELOG.md) for behavior changes and 1.0.0 production stability guarantees.
 
 ---
 
@@ -466,8 +466,8 @@ Report vulnerabilities privately using [SECURITY.md](SECURITY.md).
 The group ID is `io.github.amaljeevs`. Publishing is a maintainer release action:
 select an unused non-SNAPSHOT release version, run all checks, configure Central
 credentials/signing, then use `./mvnw clean deploy -P release` (Windows:
-`./mvnw.cmd clean deploy -P release`). Version `0.2.1` is published on Maven Central;
-subsequent releases must use an incremented version.
+`./mvnw.cmd clean deploy -P release`). Version `0.2.1` is published on Maven Central (current latest release);
+version `1.0.0` is the finalized upcoming production-stable release. Subsequent releases must use an incremented version.
 
 To publish through GitHub Actions, run **Publish to Maven Central** on the updated
 `main` branch, or publish a release whose tag points to the release-version commit.

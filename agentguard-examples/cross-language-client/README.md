@@ -1,6 +1,6 @@
 # AgentGuard Cross-Language Client Example
 
-AgentGuard provides deterministic authorization and governance not just for Java, but for any AI agent environment (Python, Node.js, Go, Rust) via its standard HTTP authorization endpoint:
+AgentGuard provides deterministic authorization and governance not just for Java, but for any AI agent environment (Python, Node.js, Go, Rust) via its standard HTTP authorization endpoint (available in release 0.2.1 and stabilized for 1.0.0):
 
 ```http
 POST /v1/authorize

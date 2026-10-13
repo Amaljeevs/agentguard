@@ -1,6 +1,19 @@
 # Changelog
 
-## 0.2.1
+## 1.0.0 (Planned Stable Release)
+
+AgentGuard 1.0.0 represents the first major, production-stable release of AgentGuard. It finalizes the core API contracts, security invariants, enterprise identity mappings, and architectural guarantees for tool authorization, cryptographic request-bound approvals, and sanitized audit logging.
+
+### Production Stability Guarantees
+- **Finalized Core API Contract**: Stable, frozen public interfaces for `PolicyEngine`, `AgentIdentityResolver`, `ApprovalService`, `ApprovalStore`, and `AuditPublisher`.
+- **Deterministic Governance Invariants**: Guaranteed fail-closed, deny-by-default evaluation across all paths; strict precedence (`DENY` > `APPROVAL_REQUIRED` > `ALLOW`); delegation authority monotonicity (`child permissions ⊆ parent permissions`), cycle detection, and bounded depth.
+- **Cryptographic Request-Bound Approvals**: Deterministic SHA-256 canonical argument hashing (`ApprovalTicket`) preventing argument tampering (such as unauthorized payment amount alterations or IBAN redirection in financial flows), atomic single-use ticket consumption (`CONSUMED`), and durable multi-node concurrency protection with `PostgresApprovalStore` (`SELECT ... FOR UPDATE`).
+- **Production Observability & Tracing**: Low-cardinality Micrometer metrics (`agentguard.decisions`, latency timers, approval counters) and OpenTelemetry-compatible `AgentGuardTracingHook` SPI for distributed trace ID propagation with zero secret leakage.
+- **Enterprise Identity & Multi-Tenancy**: Verified claims mapping for JWTs (OAuth2/OIDC, Microsoft Entra ID, Keycloak), SPIFFE SVID workload identities, and tenant isolation.
+- **Fintech & Multi-Channel Reference Architecture**: Complete Model Context Protocol (MCP) and multi-channel agent/chatbot connector (`/api/agent/channel/invoke`), demonstrated in `agentguard-examples/fintech-banking-mcp-server`.
+- **Adversarial Security Test Suite**: Full test coverage of all 15 attack vectors including privilege escalation, replay attacks, race conditions, delegation cycles, and malformed inputs.
+
+## 0.2.1 (Current Latest Release)
 
 ### Additions and Improvements
 - **Durable Approval Store**: Added `PostgresApprovalStore` in `agentguard-approval` with `SELECT ... FOR UPDATE` row-level locking, atomic single-use ticket consumption (`CONSUMED`), index-optimized schema DDL (`schema-postgresql.sql`), and prevention of concurrent double-consumption.

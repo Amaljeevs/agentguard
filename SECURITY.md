@@ -12,7 +12,8 @@ We will coordinate investigation, fixes, and disclosure with the reporter.
 
 | Version | Status |
 | --- | --- |
-| 0.2.1 | Active release; verified identity, bound approvals, Spring AI, Postgres durable store, Micrometer metrics, and REST API |
+| 1.0.0 | Upcoming production stable release; finalized API contracts, full adversarial test suite, enterprise identity, and durable PostgreSQL store |
+| 0.2.1 | Active release on Maven Central; verified identity, bound approvals, Spring AI, Postgres durable store, Micrometer metrics, and REST API |
 | 0.2.0 | Previous release |
 | 0.1.0 | Initial release; does not include the new hardening or approval/Spring AI modules |
 | Older versions | Unsupported pre-release builds |

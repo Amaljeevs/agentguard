@@ -5,9 +5,10 @@ Choose the version you want to evaluate:
 - **Published 0.1.0:** [H2 orders dashboard](../../agentguard-examples/h2-orders-app/README.md)
   or [standalone console demo](../../agentguard-examples/published-dependency-example/README.md).
   These resolve released Maven Central artifacts without building this repository.
-- **Release 0.2.1:** [Spring AI/MCP server](../../agentguard-examples/spring-ai-mcp-server/README.md).
+- **Current Release 0.2.1 (Preparing for 1.0.0 Stable):** [Enterprise Fintech & Banking MCP server](../../agentguard-examples/fintech-banking-mcp-server/README.md)
+  and [Spring AI/MCP server](../../agentguard-examples/spring-ai-mcp-server/README.md).
   Build the libraries locally with `mvn install`, then run the real MCP client
-  walkthrough and the reusable approval workflow.
+  walkthrough, multi-channel agent controller, and the reusable approval workflow.
 
 See the [root README](../../README.md) for starter configuration and annotation
 examples, [policy specification](POLICY_SPECIFICATION.md) for evaluation semantics,
