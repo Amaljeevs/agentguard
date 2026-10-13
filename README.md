@@ -20,7 +20,9 @@
 [![Java](https://img.shields.io/badge/Java-21%2B-orange.svg)](https://openjdk.org/projects/jdk/21/)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
-**Current Release:** `0.2.1` is published on Maven Central. See [CHANGELOG.md](CHANGELOG.md) for detailed release notes.
+**Current release: 0.2.1**
+
+See [CHANGELOG.md](CHANGELOG.md) for behavior changes and migration.
 
 ---
 
@@ -380,7 +382,7 @@ mvn -f agentguard-policy/pom.xml org.codehaus.mojo:exec-maven-plugin:3.5.0:java 
 Run the CLI from the repository root after `mvn install`. It prints decisions,
 matched rules, and policy revision; mismatched expectations return a failing
 process status. CI also builds both independent published-release examples and
-runs the development MCP network tests.
+runs the Spring AI MCP network tests.
 
 [The JMH harness](benchmarks/README.md) measures evaluation and sanitization for
 specified workloads. Report hardware, JDK and workload with results; microbenchmarks
@@ -398,7 +400,8 @@ changes are documented breaking behavior changes for consumers of 0.1.0.
 ## Boundaries and future work
 
 Structured redaction does not detect every secret in arbitrary text or sanitize
-all third-party logs. The reference approval store is not shared/durable. There
+all third-party logs. The in-memory approval store is not shared across processes
+(use `PostgresApprovalStore` for durable clustered deployments). There
 is no built-in risk scoring, universal prompt-injection protection, agent sandbox,
 or Python/TypeScript/Go runtime. See [why-agentguard.md](why-agentguard.md) for
 implemented capabilities and explicitly future work.
@@ -414,8 +417,8 @@ Report vulnerabilities privately using [SECURITY.md](SECURITY.md).
 The group ID is `io.github.amaljeevs`. Publishing is a maintainer release action:
 select an unused non-SNAPSHOT release version, run all checks, configure Central
 credentials/signing, then use `./mvnw clean deploy -P release` (Windows:
-`./mvnw.cmd clean deploy -P release`). Version `0.2.1` is
-prepared for publishing; this does not itself deploy artifacts or overwrite earlier releases.
+`./mvnw.cmd clean deploy -P release`). Version `0.2.1` is published on Maven Central;
+subsequent releases must use an incremented version.
 
 To publish through GitHub Actions, run **Publish to Maven Central** on the updated
 `main` branch, or publish a release whose tag points to the release-version commit.

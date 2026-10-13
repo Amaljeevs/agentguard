@@ -83,7 +83,7 @@ integrations are separate modules so applications can choose their dependencies.
 ## What makes an approval meaningful
 
 An approval must refer to the operation the reviewer actually authorized. The
-development approval module binds a ticket to the requester identity/session,
+approval module binds a ticket to the requester identity/session,
 action, structured arguments, resource, environment, and content-based policy
 revision. Tickets expire. The approver must have
 `agentguard.approval.approve` permission and cannot approve their own request.
@@ -96,8 +96,8 @@ Changing the order, amount, actor, or policy requires a new approval.
 This provides at-most-once admission through the approval service. It does not
 promise exactly-once external side effects. If the process crashes after consuming
 a ticket, or the business operation fails, applications must reconcile the result
-and use business idempotency/transactions where needed. The supplied in-memory
-store is single-process; clustered deployments need an atomic shared store.
+and use business idempotency/transactions where needed. The in-memory
+store is single-process; clustered deployments use `PostgresApprovalStore` for atomic row-level locking.
 
 ## What an audit record proves
 
@@ -161,8 +161,8 @@ does not prevent every malicious action an already authorized tool could perform
 
 - [H2 browser app](agentguard-examples/h2-orders-app/README.md): published release,
   real SQL, multiple users, approval queue and sanitized audit inspection.
-- [Spring AI/MCP app](agentguard-examples/spring-ai-mcp-server/README.md): development
-  modules, authenticated Streamable HTTP, real tool calls and reusable approvals.
+- [Spring AI/MCP app](agentguard-examples/spring-ai-mcp-server/README.md): Spring AI integration,
+  authenticated Streamable HTTP, real tool calls and reusable approvals.
 - [Policy scenarios](specification/examples/policy-scenarios.json): runnable
   expected decisions, including an unprivileged caller denied approval eligibility.
 - [Benchmarks](benchmarks/README.md): reproducible JMH workload and reporting
